@@ -8,7 +8,7 @@ Frostbyte is a lightweight, local-first cold data archiving tool for data engine
 
 - **Efficient Compression**: Minimize disk usage for stale or infrequently used datasets
 - **Data Versioning**: Maintain reproducible data versions with schema and content metadata
-- **Simple Commands**: Archive, restore, inspect, and diff data files with intuitive commands
+- **Simple Commands**: Archive, restore, and inspect data files with intuitive commands
 - **Extensible**: Built to be extended with different backends and UIs
 
 ## Installation
@@ -47,8 +47,7 @@ frostbyte stats
 # Restore an archived file
 frostbyte restore data/cleaned.csv
 
-# Compare two versions
-frostbyte diff data/cleaned.csv@1 data/cleaned.csv@2
+
 ```
 
 ## Usage Examples
@@ -80,10 +79,7 @@ frostbyte diff data/cleaned.csv@1 data/cleaned.csv@2
    frostbyte stats data/experiment.csv
    ```
 
-6. **Compare versions**:
-   ```bash
-   frostbyte diff data/experiment.csv@1 data/experiment.csv@2
-   ```
+
 
 ## Command Reference
 
@@ -95,29 +91,7 @@ frostbyte diff data/cleaned.csv@1 data/cleaned.csv@2
 | `frostbyte ls`              | List summary of archived files with latest versions  |
 | `frostbyte ls --all`        | List all versions with detailed info (date, size, filename) |
 | `frostbyte stats [<file>]`  | Show size savings, last access, total versions       |
-| `frostbyte diff <a> <b>`    | Show detailed row/column-level diffs between versions |
 | `frostbyte purge <file>`    | Remove archive versions or entire file from storage  |
-
-## Enhanced Diff Functionality
-
-Frostbyte provides powerful diff capabilities for comparing DataFrames and archived files:
-
-- **Key-Based Row Comparison**: Intelligently match rows using specified key columns
-- **Detailed Change Reports**: See exactly what rows were added, removed, or modified
-- **Schema Differences**: Track column additions, removals, and type changes
-- **Value-Level Changes**: Identify specific cell values that changed
-- **Smart Sampling**: View representative samples of changed rows
-
-Example:
-```python
-# Direct DataFrame comparison
-from frostbyte.utils.diff import diff_dataframes
-result = diff_dataframes(df1, df2, key_columns=['id'])
-
-# Archived file comparison
-from frostbyte import diff
-changes = diff('data.csv@1', 'data.csv@2')
-```
 
 Check the [examples directory](examples/) for more detailed usage examples.
 

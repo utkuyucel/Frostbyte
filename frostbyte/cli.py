@@ -115,25 +115,6 @@ def stats(file: Optional[str] = None):
 
 
 @cli.command()
-@click.argument('file_a', type=str)
-@click.argument('file_b', type=str)
-def diff(file_a: str, file_b: str):
-    """Show row/column-level diffs between two versions."""
-    manager = ArchiveManager()
-    diff_result = manager.diff_files(file_a, file_b)
-    
-    click.echo(f"Comparing {file_a} with {file_b}")
-    click.echo(f"- Rows added: {diff_result['rows_added']}")
-    click.echo(f"- Rows removed: {diff_result['rows_removed']}")
-    click.echo(f"- Rows modified: {diff_result['rows_modified']}")
-    
-    if diff_result['schema_changes']:
-        click.echo("Schema changes:")
-        for change in diff_result['schema_changes']:
-            click.echo(f"- {change}")
-
-
-@cli.command()
 @click.argument('file', type=str)
 @click.option('--all', is_flag=True, help='Remove all versions')
 def purge(file: str, all: bool):

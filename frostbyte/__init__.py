@@ -94,20 +94,6 @@ def stats(file_path: Optional[str] = None) -> Dict:
     return get_manager().get_stats(file_path)
 
 
-def diff(file_a: str, file_b: str) -> Dict:
-    """
-    Compare two versions of a file.
-    
-    Args:
-        file_a: First file specification (path@version)
-        file_b: Second file specification (path@version)
-        
-    Returns:
-        Dict: Differences between the files.
-    """
-    return get_manager().diff_files(file_a, file_b)
-
-
 def purge(file_path: str, all_versions: bool = False) -> Dict:
     """
     Remove archive versions.

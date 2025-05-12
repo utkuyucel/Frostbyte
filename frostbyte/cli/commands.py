@@ -177,28 +177,6 @@ def stats_cmd(file_path):
         sys.exit(1)
 
 
-@cli.command('diff')
-@click.argument('file_a', required=True)
-@click.argument('file_b', required=True)
-def diff_cmd(file_a, file_b):
-    """Show row/column-level diffs between two versions."""
-    try:
-        result = frostbyte.diff(file_a, file_b)
-        
-        click.echo(f"Comparing {file_a} and {file_b}:")
-        click.echo(f"  Rows added: {result['rows_added']}")
-        click.echo(f"  Rows removed: {result['rows_removed']}")
-        click.echo(f"  Rows modified: {result['rows_modified']}")
-        
-        if result['schema_changes']:
-            click.echo("\nSchema changes:")
-            for change in result['schema_changes']:
-                click.echo(f"  - {change}")
-    except Exception as e:
-        click.echo(click.style(f"✗ Error: {str(e)}", fg="red"))
-        sys.exit(1)
-
-
 @cli.command('purge')
 @click.argument('file_path', required=True)
 @click.option('--all', '-a', 'all_versions', is_flag=True, 

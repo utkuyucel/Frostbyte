@@ -165,20 +165,6 @@ class ArchiveManager:
         """
         return self.store.get_stats(file_path)
     
-    def diff_files(self, file_a: str, file_b: str) -> Dict:
-        """
-        Compare two versions of a file.
-        
-        Args:
-            file_a: First file specification (path@version)
-            file_b: Second file specification (path@version)
-            
-        Returns:
-            Dict: Differences between the files.
-        """
-        from frostbyte.core.diff import diff_files
-        return diff_files(file_a, file_b)
-    
     def purge(self, file_path: str, all_versions: bool = False) -> Dict:
         """
         Remove archive versions.
