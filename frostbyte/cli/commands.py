@@ -73,9 +73,13 @@ def restore_cmd(path_spec):
 
 
 @cli.command('ls')
-@click.option('--all', '-a', 'show_all', is_flag=True, help="Show all versions")
+@click.option('--all', '-a', 'show_all', is_flag=True, help="Show all versions with detailed information (creation date, file sizes, archive filenames)")
 def list_cmd(show_all):
-    """List archived files and versions."""
+    """List archived files and versions.
+    
+    Without --all: Shows summary information with latest version and total stats.
+    With --all: Shows detailed information for each version (creation date, size, filename).
+    """
     try:
         results = frostbyte.ls(show_all)
         
@@ -84,32 +88,59 @@ def list_cmd(show_all):
             return
         
         if show_all:
-            # Format for showing all versions
+            # Format for showing all versions with detailed information
             table_data = []
             for result in results:
+                # Convert sizes to KB or MB for better readability
+                original_size = result['original_size_bytes'] / 1024  # KB
+                compressed_size = result['compressed_size_bytes'] / 1024  # KB
+                size_unit = "KB"
+                
+                if original_size > 1024:
+                    original_size /= 1024  # MB
+                    compressed_size /= 1024  # MB
+                    size_unit = "MB"
+                
                 table_data.append([
                     result['original_path'],
                     result['version'],
                     result['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
-                    f"{result.get('compression_ratio', 0):.2f}%"
+                    f"{original_size:.2f} {size_unit}",
+                    f"{compressed_size:.2f} {size_unit}",
+                    f"{result.get('compression_ratio', 0):.1f}%",
+                    result['archive_filename']
                 ])
             click.echo(tabulate(
                 table_data,
-                headers=["Path", "Version", "Timestamp", "Compression"],
+                headers=["Path", "Ver", "Created", "Orig Size", "Comp Size", "Savings", "Filename"],
                 tablefmt="simple"
             ))
         else:
-            # Format for showing latest versions
+            # Format for showing latest versions with summary information
             table_data = []
             for result in results:
+                # Convert sizes to KB or MB for better readability
+                total_size = result['total_size_bytes'] / 1024  # KB
+                total_compressed = result['total_compressed_bytes'] / 1024  # KB
+                size_unit = "KB"
+                
+                if total_size > 1024:
+                    total_size /= 1024  # MB
+                    total_compressed /= 1024  # MB
+                    size_unit = "MB"
+                    
                 table_data.append([
                     result['original_path'],
                     result['latest_version'],
-                    result['version_count']
+                    result['version_count'],
+                    result['last_modified'].strftime('%Y-%m-%d %H:%M:%S'),
+                    f"{total_size:.2f} {size_unit}",
+                    f"{total_compressed:.2f} {size_unit}",
+                    f"{result.get('avg_compression', 0):.1f}%"
                 ])
             click.echo(tabulate(
                 table_data,
-                headers=["Path", "Latest Version", "Total Versions"],
+                headers=["Path", "Latest Ver", "Total Vers", "Last Modified", "Total Size", "Comp Size", "Avg Savings"],
                 tablefmt="simple"
             ))
     except Exception as e:

@@ -47,9 +47,13 @@ def restore(path: str):
 
 
 @cli.command()
-@click.option('--all', is_flag=True, help='Show all versions')
+@click.option('--all', is_flag=True, help='Show all versions with detailed information (creation date, file sizes, archive filenames)')
 def ls(all: bool):
-    """List archived files and versions."""
+    """List archived files and versions.
+    
+    Without --all: Shows summary with latest version and total stats.
+    With --all: Shows detailed information for each version.
+    """
     manager = ArchiveManager()
     archives = manager.list_archives(show_all=all)
     
@@ -59,9 +63,36 @@ def ls(all: bool):
         
     for archive in archives:
         if all:
-            click.echo(f"{archive['original_path']}@{archive['version']} - {archive['timestamp']} - {archive['compression_ratio']:.0f}% saved")
+            # Convert sizes to KB or MB for better readability
+            original_size = archive['original_size_bytes'] / 1024
+            compressed_size = archive['compressed_size_bytes'] / 1024
+            size_unit = "KB"
+            
+            if original_size > 1024:
+                original_size /= 1024
+                compressed_size /= 1024
+                size_unit = "MB"
+            
+            click.echo(f"{archive['original_path']}@{archive['version']} - {archive['archive_filename']}")
+            click.echo(f"  Created: {archive['timestamp']} - Size: {original_size:.2f} {size_unit} → {compressed_size:.2f} {size_unit} ({archive['compression_ratio']:.1f}% saved)")
+            click.echo(f"  Rows: {archive['row_count']}")
         else:
-            click.echo(f"{archive['original_path']} - {archive['latest_version']} version(s)")
+            last_version = archive['latest_version']
+            total_versions = archive['version_count']
+            
+            # Convert sizes to KB or MB for better readability
+            total_size = archive['total_size_bytes'] / 1024
+            total_compressed = archive['total_compressed_bytes'] / 1024
+            size_unit = "KB"
+            
+            if total_size > 1024:
+                total_size /= 1024
+                total_compressed /= 1024
+                size_unit = "MB"
+                
+            click.echo(f"{archive['original_path']} - Version {last_version} of {total_versions}")
+            click.echo(f"  Last modified: {archive['last_modified']}")
+            click.echo(f"  Total size: {total_size:.2f} {size_unit} → {total_compressed:.2f} {size_unit} ({archive['avg_compression']:.1f}% saved)")
 
 
 @cli.command()

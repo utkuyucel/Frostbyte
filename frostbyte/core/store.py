@@ -198,14 +198,23 @@ class MetadataStore:
         try:
             if show_all:
                 query = """
-                SELECT * FROM archives
-                ORDER BY original_path, version
+                SELECT a.*, 
+                       (json_extract(a.schema, '$.row_count') :: INT) * (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT) AS original_size_bytes,
+                       (json_extract(a.schema, '$.row_count') :: INT) * (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT) * (1 - a.compression_ratio / 100) AS compressed_size_bytes,
+                       SPLIT_PART(a.storage_path, '/', -1) AS archive_filename
+                FROM archives a
+                ORDER BY a.original_path, a.version
                 """
                 results = conn.execute(query).fetchall()
             else:
                 query = """
-                SELECT a.original_path, MAX(a.version) AS latest_version,
-                       COUNT(*) AS version_count
+                SELECT a.original_path, 
+                       MAX(a.version) AS latest_version,
+                       COUNT(*) AS version_count,
+                       MAX(a.timestamp) AS last_modified,
+                       SUM((json_extract(a.schema, '$.row_count') :: INT) * (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT)) AS total_size_bytes,
+                       SUM((json_extract(a.schema, '$.row_count') :: INT) * (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT) * (1 - a.compression_ratio / 100)) AS total_compressed_bytes,
+                       AVG(a.compression_ratio) AS avg_compression
                 FROM archives a
                 GROUP BY a.original_path
                 ORDER BY a.original_path
