@@ -89,14 +89,13 @@ frostbyte diff data/cleaned.csv@1 data/cleaned.csv@2
 
 | Command                     | Description                                          |
 |-----------------------------|------------------------------------------------------|
-| `frostbyte init`            | Initialize project, create `.frostbyte/` directory   |
+| `frostbyte init`            | Initialize project, create `.frostbyte/` directory (recreates DB if exists) |
 | `frostbyte archive <path>`  | Compress file, record metadata                       |
 | `frostbyte restore <path>`  | Decompress and restore original file                 |
 | `frostbyte ls [--all]`      | List archived files and versions                     |
 | `frostbyte stats [<file>]`  | Show size savings, last access, total versions       |
 | `frostbyte diff <a> <b>`    | Show detailed row/column-level diffs between versions |
 | `frostbyte purge <file>`    | Remove archive versions or entire file from storage  |
-| `frostbyte gui`             | Launch optional Streamlit GUI (coming soon)          |
 
 ## Enhanced Diff Functionality
 

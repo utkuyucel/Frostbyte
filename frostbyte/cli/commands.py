@@ -6,7 +6,6 @@ This module provides the command implementations for the Frostbyte CLI.
 
 import click
 from tabulate import tabulate
-from datetime import datetime
 import sys
 
 import frostbyte
@@ -26,11 +25,12 @@ def cli():
 
 @cli.command('init')
 def init_cmd():
-    """Initialize project, create .frostbyte/ directory."""
+    """Initialize project, create .frostbyte/ directory. Recreates database if it exists."""
     try:
         result = frostbyte.init()
         if result:
             click.echo(click.style("✓ Frostbyte initialized successfully", fg="green"))
+            click.echo(click.style("  Database reset to empty state", fg="blue"))
         else:
             click.echo(click.style("✗ Failed to initialize Frostbyte", fg="red"))
             sys.exit(1)
@@ -189,8 +189,4 @@ def purge_cmd(file_path, all_versions):
         sys.exit(1)
 
 
-@cli.command('gui')
-def gui_cmd():
-    """Launch optional Streamlit GUI (coming in v0.2)."""
-    click.echo(click.style("The GUI interface is coming in v0.2", fg="yellow"))
-    click.echo("This feature is not yet implemented.")
+

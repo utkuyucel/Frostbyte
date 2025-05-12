@@ -4,8 +4,6 @@ Database interactions for Frostbyte.
 Manages metadata storage for archived files.
 """
 
-import os
-import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Union
@@ -27,14 +25,21 @@ class MetadataStore:
         self.db_path = Path(db_path)
         
     def initialize(self):
-        """Create the database schema if it doesn't exist."""
+        """Create the database schema, deleting any existing database."""
+        # Delete existing database file if it exists
+        if self.db_path.exists():
+            self.db_path.unlink()
+            
+        # Make sure the parent directory exists
+        self.db_path.parent.mkdir(exist_ok=True)
+        
         # Connect to DuckDB
         conn = duckdb.connect(str(self.db_path))
         
         try:
             # Create archives table
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS archives (
+            CREATE TABLE archives (
                 id VARCHAR PRIMARY KEY,
                 original_path VARCHAR NOT NULL,
                 version INT NOT NULL,
@@ -50,7 +55,7 @@ class MetadataStore:
             
             # Create stats table
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS stats (
+            CREATE TABLE stats (
                 archive_id VARCHAR NOT NULL,
                 column_name VARCHAR NOT NULL,
                 min DOUBLE,

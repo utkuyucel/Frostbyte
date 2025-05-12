@@ -2,7 +2,6 @@
 Command-line interface for Frostbyte.
 """
 
-import os
 import click
 from typing import Optional
 
@@ -23,10 +22,10 @@ def cli():
 
 @cli.command()
 def init():
-    """Initialize Frostbyte in the current directory."""
+    """Initialize Frostbyte in the current directory (recreates database if it exists)."""
     manager = ArchiveManager()
     manager.initialize()
-    click.echo("Initialized Frostbyte in current directory.")
+    click.echo("Initialized Frostbyte in current directory. Database reset to empty state.")
 
 
 @cli.command()
@@ -115,13 +114,6 @@ def purge(file: str, all: bool):
         click.echo(f"Removed all versions of {result['original_path']}")
     else:
         click.echo(f"Removed version {result['version']} of {result['original_path']}")
-
-
-@cli.command()
-def gui():
-    """Launch Streamlit GUI for visual management."""
-    # This will be implemented in a later version
-    click.echo("GUI not yet implemented. Coming in v0.2!")
 
 
 if __name__ == '__main__':
