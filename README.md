@@ -17,6 +17,12 @@ Frostbyte is a lightweight, local-first cold data archiving tool for data engine
 # Install from source
 git clone https://github.com/utkuyucel/Frostbyte.git
 cd frostbyte
+
+# Create virtual environment
+python -m venv frostbyte_venv
+source frostbyte_venv/bin/activate  # On Windows: frostbyte_venv\Scripts\activate
+
+# Install the package
 pip install -e .
 
 # Or from PyPI (once published)
@@ -126,15 +132,16 @@ Check the [examples directory](examples/) for more detailed usage examples.
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/frostbyte.git
+git clone https://github.com/utkuyucel/frostbyte.git
 cd frostbyte
 
 # Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python -m venv frostbyte_venv
+source frostbyte_venv/bin/activate  # On Windows: frostbyte_venv\Scripts\activate
 
 # Install development dependencies
-pip install -e ".[dev]"
+pip install -e .
+pip install pytest black flake8 mypy
 ```
 
 ## License

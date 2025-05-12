@@ -11,7 +11,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="utkuyucel",
-    url="https://github.com/utkuyucel/frostbyte",  # Replace with actual GitHub URL
+    url="https://github.com/utkuyucel/Frostbyte",
     packages=find_packages(),
     include_package_data=True,
     python_requires=">=3.8",
