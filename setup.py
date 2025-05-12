@@ -23,7 +23,18 @@ setup(
         "zstandard>=0.18.0",
         "pyarrow>=7.0.0",  # For Parquet support
         "pyyaml>=6.0",
+        "tabulate>=0.9.0",
     ],
+    extras_require={
+        'dev': [
+            "pytest>=7.0.0",
+            "pytest-cov>=3.0.0",
+            "black>=22.0.0",
+            "isort>=5.10.0",
+            "mypy>=0.950",
+            "flake8>=5.0.0",
+        ]
+    },
     entry_points={
         "console_scripts": [
             "frostbyte=frostbyte.cli:cli",
