@@ -1,0 +1,348 @@
+"""
+Database interactions for Frostbyte.
+
+Manages metadata storage for archived files.
+"""
+
+import os
+import sqlite3
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional, Union
+
+import duckdb
+from frostbyte.utils.json_utils import json_dumps
+
+
+class MetadataStore:
+    """Handles database interactions for Frostbyte metadata."""
+    
+    def __init__(self, db_path: Union[str, Path]):
+        """
+        Initialize the metadata store.
+        
+        Args:
+            db_path: Path to the metadata database
+        """
+        self.db_path = Path(db_path)
+        
+    def initialize(self):
+        """Create the database schema if it doesn't exist."""
+        # Connect to DuckDB
+        conn = duckdb.connect(str(self.db_path))
+        
+        try:
+            # Create archives table
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS archives (
+                id VARCHAR PRIMARY KEY,
+                original_path VARCHAR NOT NULL,
+                version INT NOT NULL,
+                timestamp TIMESTAMP NOT NULL,
+                hash VARCHAR NOT NULL,
+                row_count INT,
+                schema JSON,
+                compression_ratio REAL,
+                storage_path VARCHAR NOT NULL,
+                UNIQUE(original_path, version)
+            )
+            """)
+            
+            # Create stats table
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS stats (
+                archive_id VARCHAR NOT NULL,
+                column_name VARCHAR NOT NULL,
+                min DOUBLE,
+                max DOUBLE,
+                mean DOUBLE,
+                stddev DOUBLE,
+                PRIMARY KEY (archive_id, column_name),
+                FOREIGN KEY (archive_id) REFERENCES archives(id)
+            )
+            """)
+            
+            conn.commit()
+        finally:
+            conn.close()
+    
+    def add_archive(self, id: str, original_path: str, version: int,
+                  timestamp: datetime, hash: str, row_count: int,
+                  schema: Dict, compression_ratio: float, storage_path: str):
+        """
+        Add a new archive entry to the database.
+        
+        Args:
+            id: UUID for the archive
+            original_path: Path to the original file
+            version: Version number
+            timestamp: When the archive was created
+            hash: Hash of the original file
+            row_count: Number of rows in the file
+            schema: Schema of the file as a JSON object
+            compression_ratio: Compression ratio (percentage saved)
+            storage_path: Path to the compressed archive
+        """
+        conn = duckdb.connect(str(self.db_path))
+        
+        try:
+            conn.execute("""
+            INSERT INTO archives (
+                id, original_path, version, timestamp, hash,
+                row_count, schema, compression_ratio, storage_path
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                id, original_path, version, timestamp, hash,
+                row_count, json_dumps(schema), compression_ratio, storage_path
+            ))
+            
+            # Add column stats if available
+            if schema and 'columns' in schema:
+                for col_name, stats in schema['columns'].items():
+                    if 'stats' in stats:
+                        conn.execute("""
+                        INSERT INTO stats (
+                            archive_id, column_name, min, max, mean, stddev
+                        ) VALUES (?, ?, ?, ?, ?, ?)
+                        """, (
+                            id, col_name,
+                            stats['stats'].get('min'),
+                            stats['stats'].get('max'),
+                            stats['stats'].get('mean'),
+                            stats['stats'].get('stddev')
+                        ))
+            
+            conn.commit()
+        finally:
+            conn.close()
+    
+    def get_next_version(self, file_path: str) -> int:
+        """
+        Get the next version number for a file.
+        
+        Args:
+            file_path: Path to the file
+            
+        Returns:
+            int: Next version number
+        """
+        conn = duckdb.connect(str(self.db_path))
+        
+        try:
+            result = conn.execute("""
+            SELECT COALESCE(MAX(version), 0) + 1 AS next_version
+            FROM archives
+            WHERE original_path = ?
+            """, (file_path,)).fetchone()
+            
+            return result[0]
+        finally:
+            conn.close()
+    
+    def get_archive(self, file_path: str, version: Optional[Union[int, float]] = None) -> Optional[Dict]:
+        """
+        Get information about an archived file.
+        
+        Args:
+            file_path: Path to the file
+            version: Version number, or None for latest
+            
+        Returns:
+            Optional[Dict]: Archive information, or None if not found
+        """
+        conn = duckdb.connect(str(self.db_path))
+        
+        try:
+            if version is None:
+                query = """
+                SELECT * FROM archives
+                WHERE original_path = ?
+                ORDER BY version DESC
+                LIMIT 1
+                """
+                params = (file_path,)
+            else:
+                query = """
+                SELECT * FROM archives
+                WHERE original_path = ? AND version = ?
+                """
+                params = (file_path, int(version))
+            
+            result = conn.execute(query, params).fetchone()
+            
+            if result:
+                columns = [desc[0] for desc in conn.description]
+                return {columns[i]: result[i] for i in range(len(columns))}
+            
+            return None
+        finally:
+            conn.close()
+    
+    def list_archives(self, show_all: bool = False) -> List[Dict]:
+        """
+        List archived files.
+        
+        Args:
+            show_all: If True, show all versions; otherwise, show latest only
+            
+        Returns:
+            List[Dict]: Archive information
+        """
+        conn = duckdb.connect(str(self.db_path))
+        
+        try:
+            if show_all:
+                query = """
+                SELECT * FROM archives
+                ORDER BY original_path, version
+                """
+                results = conn.execute(query).fetchall()
+            else:
+                query = """
+                SELECT a.original_path, MAX(a.version) AS latest_version,
+                       COUNT(*) AS version_count
+                FROM archives a
+                GROUP BY a.original_path
+                ORDER BY a.original_path
+                """
+                results = conn.execute(query).fetchall()
+            
+            if not results:
+                return []
+            
+            columns = [desc[0] for desc in conn.description]
+            return [
+                {columns[i]: row[i] for i in range(len(columns))}
+                for row in results
+            ]
+        finally:
+            conn.close()
+    
+    def get_stats(self, file_path: Optional[str] = None) -> Dict:
+        """
+        Get statistics about archived files.
+        
+        Args:
+            file_path: Path to specific file, or None for all
+            
+        Returns:
+            Dict: Statistics about the archived file(s)
+        """
+        conn = duckdb.connect(str(self.db_path))
+        
+        try:
+            if file_path:
+                # Stats for specific file
+                query = """
+                SELECT a.original_path,
+                       COUNT(*) AS versions,
+                       MAX(a.version) AS latest_version,
+                       MAX(a.timestamp) AS last_modified,
+                       SUM((1 - a.compression_ratio / 100) * a.row_count * 
+                           (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT)) AS size_saved
+                FROM archives a
+                WHERE a.original_path = ?
+                GROUP BY a.original_path
+                """
+                result = conn.execute(query, (file_path,)).fetchone()
+                
+                if result:
+                    columns = [desc[0] for desc in conn.description]
+                    return {columns[i]: result[i] for i in range(len(columns))}
+                return {}
+            else:
+                # Overall stats
+                query = """
+                SELECT COUNT(*) AS total_archives,
+                       SUM((1 - a.compression_ratio / 100) * a.row_count * 
+                           (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT)) / 1024 / 1024 AS total_size_saved,
+                       AVG(a.compression_ratio) AS avg_compression_ratio
+                FROM archives a
+                """
+                result = conn.execute(query).fetchone()
+                
+                if result:
+                    columns = [desc[0] for desc in conn.description]
+                    return {columns[i]: result[i] for i in range(len(columns))}
+                return {}
+        finally:
+            conn.close()
+    
+    def remove_archives(self, file_path: str, version: Optional[int] = None, all_versions: bool = False) -> Dict:
+        """
+        Remove archive entries from the database.
+        
+        Args:
+            file_path: Path to the file
+            version: Version number, or None for latest
+            all_versions: If True, remove all versions
+            
+        Returns:
+            Dict: Information about the removed entries
+        """
+        conn = duckdb.connect(str(self.db_path))
+        
+        try:
+            # First, get storage paths to delete files later
+            if all_versions:
+                query = """
+                SELECT storage_path
+                FROM archives
+                WHERE original_path = ?
+                """
+                params = (file_path,)
+            elif version is not None:
+                query = """
+                SELECT storage_path
+                FROM archives
+                WHERE original_path = ? AND version = ?
+                """
+                params = (file_path, version)
+            else:
+                query = """
+                SELECT storage_path
+                FROM archives
+                WHERE original_path = ?
+                ORDER BY version DESC
+                LIMIT 1
+                """
+                params = (file_path,)
+            
+            storage_paths = [row[0] for row in conn.execute(query, params).fetchall()]
+            
+            # Now delete from the database
+            if all_versions:
+                query = """
+                DELETE FROM archives
+                WHERE original_path = ?
+                """
+                params = (file_path,)
+            elif version is not None:
+                query = """
+                DELETE FROM archives
+                WHERE original_path = ? AND version = ?
+                """
+                params = (file_path, version)
+            else:
+                query = """
+                DELETE FROM archives
+                WHERE id IN (
+                    SELECT id FROM archives
+                    WHERE original_path = ?
+                    ORDER BY version DESC
+                    LIMIT 1
+                )
+                """
+                params = (file_path,)
+            
+            result = conn.execute(query, params)
+            count = result.getrows()
+            
+            conn.commit()
+            
+            return {
+                'count': count,
+                'storage_paths': storage_paths
+            }
+        finally:
+            conn.close()

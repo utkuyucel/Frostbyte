@@ -1,8 +1,45 @@
-.env
+# Python cache files
 __pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+*.mypy_cache/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+ENV/
+*_venv/
+.env
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+coverage.xml
+*.cover
+.hypothesis/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
 .DS_Store
-*.pyc
-*.pyo
-.github/
-frostbyte_venv/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# Frostbyte specific
+.frostbyte/
 *data.db
+
+# GitHub workflows (if not public yet)
+.github/
