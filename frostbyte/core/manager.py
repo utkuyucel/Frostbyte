@@ -20,12 +20,7 @@ class ArchiveManager:
     """Manages archiving, restoring, and queries for Frostbyte."""
     
     def __init__(self, config_path: Optional[str] = None):
-        """
-        Initialize the archive manager.
-        
-        Args:
-            config_path: Path to configuration file. If None, uses default.
-        """
+        """Initialize the archive manager with optional config path."""
         self.base_dir = Path(os.getcwd())
         self.frostbyte_dir = self.base_dir / '.frostbyte'
         self.archives_dir = self.frostbyte_dir / 'archives'
@@ -34,12 +29,7 @@ class ArchiveManager:
         self.compressor = Compressor()
         
     def initialize(self) -> bool:
-        """
-        Initialize a new Frostbyte repository in the current directory.
-        
-        Returns:
-            bool: True if successful, False otherwise.
-        """
+        """Initialize a new Frostbyte repository in the current directory."""
         try:
             # Create directories if they don't exist
             self.frostbyte_dir.mkdir(exist_ok=True)
@@ -54,15 +44,7 @@ class ArchiveManager:
             return False
     
     def archive(self, file_path: str) -> Dict:
-        """
-        Archive a file.
-        
-        Args:
-            file_path: Path to the file to archive.
-            
-        Returns:
-            Dict: Information about the archived file.
-        """
+        """Archive a file and return information about the archived file."""
         file_path_obj = Path(file_path).resolve()
         file_path_str = str(file_path_obj)
         
@@ -110,18 +92,7 @@ class ArchiveManager:
         }
     
     def restore(self, path_spec: str) -> Dict:
-        """
-        Restore an archived file to its original location.
-        
-        Args:
-            path_spec: Can be one of:
-                      - Path with optional version (e.g., 'data/file.csv@2')
-                      - Archive filename (e.g., 'customer_data_v1.csv.fbyt')
-                      - Partial filename to search for (e.g., 'customer')
-            
-        Returns:
-            Dict: Information about the restored file.
-        """
+        """Restore an archived file using path, version, archive filename, or partial name."""
         # Check for archive filename pattern (_v#.extension.fbyt)
         if "_v" in path_spec and path_spec.endswith(".fbyt"):
             # Extract version from the archive filename if present
@@ -189,40 +160,15 @@ class ArchiveManager:
         }
     
     def list_archives(self, show_all: bool = False) -> List[Dict]:
-        """
-        List archived files.
-        
-        Args:
-            show_all: If True, show all versions; otherwise, show latest only.
-            
-        Returns:
-            List[Dict]: Archive information.
-        """
+        """List archived files, optionally showing all versions."""
         return self.store.list_archives(show_all)
     
     def get_stats(self, file_path: Optional[str] = None) -> Dict:
-        """
-        Get statistics about archived files.
-        
-        Args:
-            file_path: Path to specific file, or None for all.
-            
-        Returns:
-            Dict: Statistics about the archived file(s).
-        """
+        """Get statistics about archived files, for specific file or all archives."""
         return self.store.get_stats(file_path)
     
     def purge(self, file_path: str, all_versions: bool = False) -> Dict:
-        """
-        Remove archive versions.
-        
-        Args:
-            file_path: Path to file, with optional version.
-            all_versions: If True, remove all versions.
-            
-        Returns:
-            Dict: Information about the purged file(s).
-        """
+        """Remove specific archive versions or all versions of a file."""
         # Parse path and version
         if '@' in file_path and not all_versions:
             path, version_str = file_path.split('@', 1)
@@ -247,15 +193,7 @@ class ArchiveManager:
         }
     
     def _parse_version(self, version_str: str) -> Union[int, float]:
-        """
-        Parse a version string into a numeric version.
-        
-        Args:
-            version_str: The version string (e.g., '1', '1.2')
-            
-        Returns:
-            Union[int, float]: The numeric version.
-        """
+        """Parse a version string into a numeric version."""
         try:
             if '.' in version_str:
                 return float(version_str)
@@ -264,13 +202,5 @@ class ArchiveManager:
             raise ValueError(f"Invalid version format: {version_str}")
     
     def find_by_name(self, name_part: str) -> List[Dict]:
-        """
-        Find archives by part of the file name.
-        
-        Args:
-            name_part: Part of the filename to search for
-            
-        Returns:
-            List[Dict]: Matching archive information
-        """
+        """Find archives by partial filename match."""
         return self.store.find_archives_by_name(name_part)

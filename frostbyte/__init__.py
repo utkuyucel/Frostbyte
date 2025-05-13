@@ -17,12 +17,7 @@ _manager: Optional[ArchiveManager] = None
 
 
 def get_manager() -> ArchiveManager:
-    """
-    Get the global archive manager instance.
-    
-    Returns:
-        ArchiveManager: The global archive manager instance.
-    """
+    """Get the global archive manager instance."""
     global _manager
     if _manager is None:
         _manager = ArchiveManager()
@@ -30,95 +25,35 @@ def get_manager() -> ArchiveManager:
 
 
 def init(path: Optional[str] = None) -> bool:
-    """
-    Initialize a new Frostbyte repository.
-    
-    Args:
-        path: Path to initialize. If None, uses current directory.
-        
-    Returns:
-        bool: True if successful, False otherwise.
-    """
+    """Initialize a new Frostbyte repository."""
     return get_manager().initialize()
 
 
 def archive(file_path: str) -> Dict:
-    """
-    Archive a file.
-    
-    Args:
-        file_path: Path to the file to archive.
-        
-    Returns:
-        Dict: Information about the archived file.
-    """
+    """Archive a file and store its metadata."""
     return get_manager().archive(file_path)
 
 
 def restore(path_spec: str) -> Dict:
-    """
-    Restore an archived file to its original location.
-    
-    Args:
-        path_spec: Can be one of:
-            - Path with optional version (e.g., 'data/file.csv@2')
-            - Archive filename (e.g., 'customer_data_v1.csv.fbyt')
-            - Partial filename to search for (e.g., 'customer_data')
-        
-    Returns:
-        Dict: Information about the restored file.
-    """
+    """Restore an archived file using path, version, archive filename, or partial name."""
     return get_manager().restore(path_spec)
 
 
 def ls(show_all: bool = False) -> List[Dict]:
-    """
-    List archived files.
-    
-    Args:
-        show_all: If True, show all versions; otherwise, show latest only.
-        
-    Returns:
-        List[Dict]: Archive information.
-    """
+    """List archived files, optionally showing all versions."""
     return get_manager().list_archives(show_all)
 
 
 def stats(file_path: Optional[str] = None) -> Dict:
-    """
-    Get statistics about archived files.
-    
-    Args:
-        file_path: Path to specific file, or None for all.
-        
-    Returns:
-        Dict: Statistics about the archived file(s).
-    """
+    """Get statistics about archived files, for specific file or all archives."""
     return get_manager().get_stats(file_path)
 
 
 def purge(file_path: str, all_versions: bool = False) -> Dict:
-    """
-    Remove archive versions.
-    
-    Args:
-        file_path: Path to file, with optional version.
-        all_versions: If True, remove all versions.
-        
-    Returns:
-        Dict: Information about the purged file(s).
-    """
+    """Remove specific archive versions or all versions of a file."""
     return get_manager().purge(file_path, all_versions)
 
 
 def find_by_name(name_part: str) -> List[Dict]:
-    """
-    Find archives by part of the file name.
-    
-    Args:
-        name_part: Part of the filename to search for
-        
-    Returns:
-        List[Dict]: Matching archive information
-    """
+    """Find archives by partial filename match."""
     return get_manager().find_by_name(name_part)

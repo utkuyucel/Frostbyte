@@ -21,12 +21,7 @@ class MetadataStore:
     """Handles database interactions for Frostbyte metadata."""
     
     def __init__(self, db_path: Union[str, Path]):
-        """
-        Initialize the metadata store.
-        
-        Args:
-            db_path: Path to the metadata database
-        """
+        """Initialize the metadata store with database path."""
         self.db_path = Path(db_path)
         
     def initialize(self) -> None:
@@ -79,20 +74,7 @@ class MetadataStore:
     def add_archive(self, id: str, original_path: str, version: int,
                   timestamp: datetime, hash: str, row_count: int,
                   schema: Dict, compression_ratio: float, storage_path: str) -> None:
-        """
-        Add a new archive entry to the database.
-        
-        Args:
-            id: UUID for the archive
-            original_path: Path to the original file
-            version: Version number
-            timestamp: When the archive was created
-            hash: Hash of the original file
-            row_count: Number of rows in the file
-            schema: Schema of the file as a JSON object
-            compression_ratio: Compression ratio (percentage saved)
-            storage_path: Path to the compressed archive
-        """
+        """Add a new archive entry to the database with associated metadata."""
         conn = duckdb.connect(str(self.db_path))
         
         try:
@@ -127,15 +109,7 @@ class MetadataStore:
             conn.close()
     
     def get_next_version(self, file_path: str) -> int:
-        """
-        Get the next version number for a file.
-
-        Args:
-            file_path: Path to the file
-
-        Returns:
-            int: Next version number
-        """
+        """Get the next sequential version number for a file."""
         conn = duckdb.connect(str(self.db_path))
 
         try:
@@ -153,16 +127,7 @@ class MetadataStore:
             conn.close()
     
     def get_archive(self, file_path: str, version: Optional[Union[int, float]] = None) -> Optional[Dict]:
-        """
-        Get information about an archived file.
-        
-        Args:
-            file_path: Path to the file
-            version: Version number, or None for latest
-            
-        Returns:
-            Optional[Dict]: Archive information, or None if not found
-        """
+        """Get information about an archived file, optionally by specific version."""
         conn = duckdb.connect(str(self.db_path))
         
         try:
@@ -195,15 +160,7 @@ class MetadataStore:
             conn.close()
     
     def list_archives(self, show_all: bool = False) -> List[Dict]:
-        """
-        List archived files.
-        
-        Args:
-            show_all: If True, show all versions; otherwise, show latest only
-            
-        Returns:
-            List[Dict]: Archive information
-        """
+        """List archived files, optionally showing all versions."""
         conn = duckdb.connect(str(self.db_path))
         
         try:
@@ -250,15 +207,7 @@ class MetadataStore:
             conn.close()
     
     def get_stats(self, file_path: Optional[str] = None) -> Dict:
-        """
-        Get statistics about archived files.
-        
-        Args:
-            file_path: Path to specific file, or None for all
-            
-        Returns:
-            Dict: Statistics about the archived file(s)
-        """
+        """Get statistics about archived files, for specific file or all archives."""
         conn = duckdb.connect(str(self.db_path))
         
         try:
@@ -395,15 +344,7 @@ class MetadataStore:
             conn.close()
     
     def find_archives_by_name(self, name_part: str) -> List[Dict]:
-        """
-        Find archives by part of the original file name or archive filename.
-        
-        Args:
-            name_part: Part of the filename to search for (original path or archive filename)
-            
-        Returns:
-            List[Dict]: Matching archive information
-        """
+        """Find archives by part of the original file name or archive filename."""
         conn = duckdb.connect(str(self.db_path))
         
         try:

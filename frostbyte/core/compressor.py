@@ -1,5 +1,6 @@
 """
-Compression functionality for Frostbyte.
+Compression funct    def compress(self, source_path: Union[str, Path], target_path: Union[str, Path]) -> int:
+        """Compress a file using Zstandard and return compressed file size in bytes."""r Frostbyte.
 
 Uses Zstandard (zstd) for high-ratio compression of data files.
 """
@@ -15,13 +16,7 @@ class Compressor:
     """Handles compression and decompression of data files."""
     
     def __init__(self, compression_level: int = 3, chunk_size: int = 1024 * 1024):
-        """
-        Initialize the compressor.
-        
-        Args:
-            compression_level: Zstandard compression level (1-22)
-            chunk_size: Size of chunks for reading/writing large files
-        """
+        """Initialize the compressor with compression level and chunk size."""
         self.compression_level = compression_level
         self.chunk_size = chunk_size
     
@@ -55,16 +50,7 @@ class Compressor:
         return target_path.stat().st_size
     
     def decompress(self, source_path: Union[str, Path], target_path: Union[str, Path]) -> int:
-        """
-        Decompress a file compressed with Zstandard.
-        
-        Args:
-            source_path: Path to the compressed file
-            target_path: Path where the decompressed file will be written
-            
-        Returns:
-            int: Size of the decompressed file in bytes
-        """
+        """Decompress a file compressed with Zstandard and return decompressed file size."""
         source_path = Path(source_path)
         target_path = Path(target_path)
         
