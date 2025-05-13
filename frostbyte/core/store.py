@@ -393,3 +393,51 @@ class MetadataStore:
             }
         finally:
             conn.close()
+    
+    def find_archives_by_name(self, name_part: str) -> List[Dict]:
+        """
+        Find archives by part of the original file name or archive filename.
+        
+        Args:
+            name_part: Part of the filename to search for (original path or archive filename)
+            
+        Returns:
+            List[Dict]: Matching archive information
+        """
+        conn = duckdb.connect(str(self.db_path))
+        
+        try:
+            # First try to find by original path (existing functionality)
+            query = """
+            SELECT original_path, MAX(version) as latest_version
+            FROM archives
+            WHERE CONTAINS(original_path, ?)
+            GROUP BY original_path
+            ORDER BY original_path
+            """
+            
+            get_params = (name_part,)
+            cursor = conn.execute(query, get_params)
+            results = cursor.fetchall() if cursor else []
+            
+            # If no results, try to find by archive filename
+            if not results:
+                query = """
+                SELECT original_path, version as latest_version, storage_path
+                FROM archives
+                WHERE CONTAINS(SPLIT_PART(storage_path, '/', -1), ?)
+                ORDER BY original_path
+                """
+                cursor = conn.execute(query, get_params)
+                results = cursor.fetchall() if cursor else []
+            
+            if not results:
+                return []
+            
+            columns = [desc[0] for desc in cursor.description] if cursor.description else []
+            return [
+                {columns[i]: row[i] for i in range(len(columns))}
+                for row in results
+            ]
+        finally:
+            conn.close()

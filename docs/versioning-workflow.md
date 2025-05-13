@@ -114,18 +114,32 @@ Where `<path_spec>` can be in one of these formats:
 - **Path with version** (restores a specific version):  
   `frostbyte restore customer_data.csv@2`
 
-> **Note:** Always use the original file path, not the archive file name. Frostbyte keeps track of all versions by their original path.
+- **Archive filename** (restores the specific archive):  
+  `frostbyte restore customer_data_v2.csv.fbyt`
+
+- **Partial filename** (searches for matching files):  
+  `frostbyte restore customer_data`
+
+> **Note:** You can use either the original file path or the archive filename. Frostbyte is flexible and will find the correct version based on your input.
 
 #### Restore Examples
 
 ```bash
-# Restore the latest version
+# Restore the latest version using path
 $ frostbyte restore customer_data.csv
 ✅ Restored customer_data.csv (latest) to customer_data.csv
 
-# Restore version 2 specifically
+# Restore version 2 specifically using path@version
 $ frostbyte restore customer_data.csv@2
 ✅ Restored customer_data.csv (v2) to customer_data.csv
+
+# Restore using the archive filename
+$ frostbyte restore customer_data_v1.csv.fbyt
+✅ Restored customer_data.csv (v1) to customer_data.csv
+
+# Restore using just the partial name (if it uniquely identifies one file)
+$ frostbyte restore customer_data
+✅ Restored customer_data.csv (latest) to customer_data.csv
 
 # For files in subdirectories, include the relative or absolute path
 $ frostbyte restore data/raw/customer_data.csv@1
@@ -137,6 +151,8 @@ id,name,email,signup_date,purchase_count
 1,John Doe,john@example.com,2023-01-15,5
 2,Jane Smith,jane@example.com,2023-02-20,3
 ```
+
+> **Note:** When using partial names, if multiple files match, Frostbyte will show you the list of matching files and ask you to be more specific.
 
 ### 6. Continue Working from a Previous Version
 

@@ -114,24 +114,68 @@ class ArchiveManager:
         Restore an archived file to its original location.
         
         Args:
-            path_spec: Path with optional version (e.g., 'data/file.csv@2')
+            path_spec: Can be one of:
+                      - Path with optional version (e.g., 'data/file.csv@2')
+                      - Archive filename (e.g., 'customer_data_v1.csv.fbyt')
+                      - Partial filename to search for (e.g., 'customer')
             
         Returns:
             Dict: Information about the restored file.
         """
-        # Parse path and version
-        if '@' in path_spec:
+        # Check for archive filename pattern (_v#.extension.fbyt)
+        if "_v" in path_spec and path_spec.endswith(".fbyt"):
+            # Extract version from the archive filename if present
+            try:
+                # Parse potential archive filename (e.g., 'customer_data_v1.csv.fbyt')
+                matches = self.find_by_name(path_spec)
+                if matches:
+                    if len(matches) == 1:
+                        # For archive filenames, we already have the version in the match
+                        archive_info = self.store.get_archive(
+                            matches[0]['original_path'], 
+                            matches[0]['latest_version']
+                        )
+                    else:
+                        # Multiple matching archive filenames
+                        match_paths = [f"{m['original_path']} (v{m['latest_version']})" for m in matches]
+                        matches_str = '\n  '.join(match_paths)
+                        raise ValueError(f"Multiple archives match '{path_spec}':\n  {matches_str}\nPlease be more specific.")
+                else:
+                    raise ValueError(f"No archives found matching: {path_spec}")
+            except ValueError:
+                # If parsing fails, continue to regular path handling
+                archive_info = None
+        # Parse path with @version
+        elif '@' in path_spec:
             path, version_str = path_spec.split('@', 1)
             version = self._parse_version(version_str)
+            
+            # Get archive info by exact path and version
+            archive_info = self.store.get_archive(path, version)
+            if not archive_info:
+                raise ValueError(f"Archive not found: {path_spec}")
         else:
-            path = path_spec
-            version = None  # Use latest
+            # First try as exact path with latest version
+            archive_info = self.store.get_archive(path_spec)
+            
+            # If not found, try as a partial name search
+            if not archive_info:
+                matches = self.find_by_name(path_spec)
+                if not matches:
+                    raise ValueError(f"No archives found matching: {path_spec}")
+                
+                if len(matches) > 1:
+                    # If multiple matches, show options to the user
+                    match_paths = [f"{m['original_path']} (v{m['latest_version']})" for m in matches]
+                    matches_str = '\n  '.join(match_paths)
+                    raise ValueError(f"Multiple archives match '{path_spec}':\n  {matches_str}\nPlease be more specific or use the full path.")
+                
+                # Get the archive info for the only match
+                archive_info = self.store.get_archive(matches[0]['original_path'], matches[0]['latest_version'])
         
-        # Get archive info
-        archive_info = self.store.get_archive(path, version)
         if not archive_info:
-            raise ValueError(f"Archive not found: {path_spec}")
-        
+            raise ValueError(f"Could not locate archive: {path_spec}")
+            
         # Decompress file
         storage_path = Path(archive_info['storage_path'])
         original_path = Path(archive_info['original_path'])
@@ -218,3 +262,15 @@ class ArchiveManager:
             return int(version_str)
         except ValueError:
             raise ValueError(f"Invalid version format: {version_str}")
+    
+    def find_by_name(self, name_part: str) -> List[Dict]:
+        """
+        Find archives by part of the file name.
+        
+        Args:
+            name_part: Part of the filename to search for
+            
+        Returns:
+            List[Dict]: Matching archive information
+        """
+        return self.store.find_archives_by_name(name_part)

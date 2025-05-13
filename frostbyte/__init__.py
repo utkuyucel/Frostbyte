@@ -60,7 +60,10 @@ def restore(path_spec: str) -> Dict:
     Restore an archived file to its original location.
     
     Args:
-        path_spec: Path with optional version (e.g., 'data/file.csv@2')
+        path_spec: Can be one of:
+            - Path with optional version (e.g., 'data/file.csv@2')
+            - Archive filename (e.g., 'customer_data_v1.csv.fbyt')
+            - Partial filename to search for (e.g., 'customer_data')
         
     Returns:
         Dict: Information about the restored file.
@@ -106,3 +109,16 @@ def purge(file_path: str, all_versions: bool = False) -> Dict:
         Dict: Information about the purged file(s).
     """
     return get_manager().purge(file_path, all_versions)
+
+
+def find_by_name(name_part: str) -> List[Dict]:
+    """
+    Find archives by part of the file name.
+    
+    Args:
+        name_part: Part of the filename to search for
+        
+    Returns:
+        List[Dict]: Matching archive information
+    """
+    return get_manager().find_by_name(name_part)

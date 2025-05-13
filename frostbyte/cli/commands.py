@@ -88,8 +88,13 @@ def archive_cmd(path: str) -> None:
 def restore_cmd(path_spec: str) -> None:
     """Decompress and restore original file.
     
-    PATH_SPEC can be a file path with an optional version (e.g., data/file.csv@2).
+    PATH_SPEC can be:
+    - A file path with an optional version (e.g., data/file.csv@2)
+    - An archive filename (e.g., customer_data_v1.csv.fbyt)
+    - A partial filename to search for (e.g., customer_data)
+    
     If no version is specified, the latest version is restored.
+    When using a partial name, if multiple files match, you'll be asked to be more specific.
     """
     try:
         result = frostbyte.restore(path_spec)
