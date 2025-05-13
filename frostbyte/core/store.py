@@ -1,12 +1,17 @@
 """
-Database interactions for Frostbyte.
+Dafrom datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional, Union, Tuple, Any, cast
+
+import duckdb
+from frostbyte.utils.json_utils import json_dumps interactions for Frostbyte.
 
 Manages metadata storage for archived files.
 """
 
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Tuple, Any
 
 import duckdb
 from frostbyte.utils.json_utils import json_dumps
@@ -24,7 +29,7 @@ class MetadataStore:
         """
         self.db_path = Path(db_path)
         
-    def initialize(self):
+    def initialize(self) -> None:
         """Create the database schema, deleting any existing database."""
         # Delete existing database file if it exists
         if self.db_path.exists():
@@ -73,7 +78,7 @@ class MetadataStore:
     
     def add_archive(self, id: str, original_path: str, version: int,
                   timestamp: datetime, hash: str, row_count: int,
-                  schema: Dict, compression_ratio: float, storage_path: str):
+                  schema: Dict, compression_ratio: float, storage_path: str) -> None:
         """
         Add a new archive entry to the database.
         
@@ -124,23 +129,26 @@ class MetadataStore:
     def get_next_version(self, file_path: str) -> int:
         """
         Get the next version number for a file.
-        
+
         Args:
             file_path: Path to the file
-            
+
         Returns:
             int: Next version number
         """
         conn = duckdb.connect(str(self.db_path))
-        
+
         try:
-            result = conn.execute("""
-            SELECT COALESCE(MAX(version), 0) + 1 AS next_version
-            FROM archives
-            WHERE original_path = ?
-            """, (file_path,)).fetchone()
-            
-            return result[0]
+            result = conn.execute(
+                """
+                SELECT COALESCE(MAX(version), 0) + 1 AS next_version
+                FROM archives
+                WHERE original_path = ?
+                """,
+                (file_path,),
+            ).fetchone()
+
+            return int(result[0]) if result else 1
         finally:
             conn.close()
     
@@ -158,25 +166,28 @@ class MetadataStore:
         conn = duckdb.connect(str(self.db_path))
         
         try:
+            get_params: Union[Tuple[str, ...], Tuple[str, int]]
+            
             if version is None:
-                query = """
+                get_query = """
                 SELECT * FROM archives
                 WHERE original_path = ?
                 ORDER BY version DESC
                 LIMIT 1
                 """
-                params = (file_path,)
+                get_params = (file_path,)
             else:
-                query = """
+                get_query = """
                 SELECT * FROM archives
                 WHERE original_path = ? AND version = ?
                 """
-                params = (file_path, int(version))
+                get_params = (file_path, int(version))
             
-            result = conn.execute(query, params).fetchone()
+            cursor = conn.execute(get_query, get_params)
+            result = cursor.fetchone()
             
-            if result:
-                columns = [desc[0] for desc in conn.description]
+            if result and cursor.description is not None:
+                columns = [desc[0] for desc in cursor.description]
                 return {columns[i]: result[i] for i in range(len(columns))}
             
             return None
@@ -205,7 +216,8 @@ class MetadataStore:
                 FROM archives a
                 ORDER BY a.original_path, a.version
                 """
-                results = conn.execute(query).fetchall()
+                result_cursor = conn.execute(query)
+                results = result_cursor.fetchall() if result_cursor else []
             else:
                 query = """
                 SELECT a.original_path, 
@@ -219,12 +231,13 @@ class MetadataStore:
                 GROUP BY a.original_path
                 ORDER BY a.original_path
                 """
-                results = conn.execute(query).fetchall()
+                result_cursor = conn.execute(query)
+                results = result_cursor.fetchall() if result_cursor else []
             
             if not results:
                 return []
             
-            columns = [desc[0] for desc in conn.description]
+            columns = [desc[0] for desc in conn.description] if conn.description else []
             return [
                 {columns[i]: row[i] for i in range(len(columns))}
                 for row in results
@@ -258,10 +271,11 @@ class MetadataStore:
                 WHERE a.original_path = ?
                 GROUP BY a.original_path
                 """
-                result = conn.execute(query, (file_path,)).fetchone()
+                result_cursor = conn.execute(query, (file_path,))
+                result = result_cursor.fetchone() if result_cursor else None
                 
                 if result:
-                    columns = [desc[0] for desc in conn.description]
+                    columns = [desc[0] for desc in conn.description] if conn.description else []
                     return {columns[i]: result[i] for i in range(len(columns))}
                 return {}
             else:
@@ -273,10 +287,11 @@ class MetadataStore:
                        AVG(a.compression_ratio) AS avg_compression_ratio
                 FROM archives a
                 """
-                result = conn.execute(query).fetchone()
+                result_cursor = conn.execute(query)
+                result = result_cursor.fetchone() if result_cursor else None
                 
                 if result:
-                    columns = [desc[0] for desc in conn.description]
+                    columns = [desc[0] for desc in conn.description] if conn.description else []
                     return {columns[i]: result[i] for i in range(len(columns))}
                 return {}
         finally:
@@ -298,47 +313,54 @@ class MetadataStore:
         
         try:
             # First, get storage paths to delete files later
+            select_query: str
+            select_params: Union[Tuple[str, ...], Tuple[str, int]]
+            
             if all_versions:
-                query = """
+                select_query = """
                 SELECT storage_path
                 FROM archives
                 WHERE original_path = ?
                 """
-                params = (file_path,)
+                select_params = (file_path,)
             elif version is not None:
-                query = """
+                select_query = """
                 SELECT storage_path
                 FROM archives
                 WHERE original_path = ? AND version = ?
                 """
-                params = (file_path, version)
+                select_params = (file_path, version)
             else:
-                query = """
+                select_query = """
                 SELECT storage_path
                 FROM archives
                 WHERE original_path = ?
                 ORDER BY version DESC
                 LIMIT 1
                 """
-                params = (file_path,)
+                select_params = (file_path,)
             
-            storage_paths = [row[0] for row in conn.execute(query, params).fetchall()]
+            result = conn.execute(select_query, select_params).fetchall()
+            storage_paths = [row[0] for row in result] if result else []
             
             # Now delete from the database
+            delete_query: str
+            delete_params: Union[Tuple[str, ...], Tuple[str, int]]
+            
             if all_versions:
-                query = """
+                delete_query = """
                 DELETE FROM archives
                 WHERE original_path = ?
                 """
-                params = (file_path,)
+                delete_params = (file_path,)
             elif version is not None:
-                query = """
+                delete_query = """
                 DELETE FROM archives
                 WHERE original_path = ? AND version = ?
                 """
-                params = (file_path, version)
+                delete_params = (file_path, version)
             else:
-                query = """
+                delete_query = """
                 DELETE FROM archives
                 WHERE id IN (
                     SELECT id FROM archives
@@ -347,10 +369,15 @@ class MetadataStore:
                     LIMIT 1
                 )
                 """
-                params = (file_path,)
+                delete_params = (file_path,)
             
-            result = conn.execute(query, params)
-            count = result.getrows()
+            # Execute the deletion query
+            conn.execute(delete_query, delete_params)
+            
+            # Get the affected row count
+            count_query = "SELECT changes()"
+            count_result = conn.execute(count_query).fetchone()
+            count = int(count_result[0]) if count_result else 0
             
             conn.commit()
             

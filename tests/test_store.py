@@ -5,16 +5,16 @@ Tests for the Frostbyte MetadataStore class.
 import os
 import tempfile
 from datetime import datetime
-from pathlib import Path
-import json
+from typing import Generator
 
+import duckdb
 import pytest
 
 from frostbyte.core.store import MetadataStore
 
 
 @pytest.fixture
-def temp_db():
+def temp_db() -> Generator[str, None, None]:
     """Create a temporary database for testing."""
     with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as temp_file:
         db_path = temp_file.name
@@ -25,11 +25,11 @@ def temp_db():
         # Clean up the database file
         try:
             os.remove(db_path)
-        except:
-            pass
+        except Exception as e:
+            print(f"Error: {e}")
 
 
-def test_initialize_store(temp_db):
+def test_initialize_store(temp_db: str) -> None:
     """Test initializing the metadata store."""
     store = MetadataStore(temp_db)
     store.initialize()
@@ -40,7 +40,18 @@ def test_initialize_store(temp_db):
     assert os.path.getsize(temp_db) > 0
 
 
-def test_add_get_archive(temp_db):
+def test_store_initialization() -> None:
+    """Test initializing the metadata store."""
+    store = MetadataStore(':memory:')
+    store.initialize()
+
+    # Ensure the database schema is created
+    conn = duckdb.connect(store.db_path)
+    tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
+    assert len(tables) > 0
+
+
+def test_add_get_archive(temp_db: str) -> None:
     """Test adding and retrieving archive metadata."""
     store = MetadataStore(temp_db)
     store.initialize()
@@ -87,7 +98,7 @@ def test_add_get_archive(temp_db):
     assert archive['storage_path'] == storage_path
 
 
-def test_get_next_version(temp_db):
+def test_get_next_version(temp_db: str) -> None:
     """Test getting the next version number for a file."""
     store = MetadataStore(temp_db)
     store.initialize()
@@ -133,7 +144,7 @@ def test_get_next_version(temp_db):
     assert next_version == 3
 
 
-def test_list_archives(temp_db):
+def test_list_archives(temp_db: str) -> None:
     """Test listing archive entries."""
     store = MetadataStore(temp_db)
     store.initialize()
@@ -196,7 +207,7 @@ def test_list_archives(temp_db):
     assert file2_archive['latest_version'] == 1
 
 
-def test_remove_archives(temp_db):
+def test_remove_archives(temp_db: str) -> None:
     """Test removing archive entries."""
     store = MetadataStore(temp_db)
     store.initialize()
@@ -249,3 +260,26 @@ def test_remove_archives(temp_db):
     # Check all were removed
     archives = store.list_archives()
     assert len(archives) == 0
+
+
+def test_store_add_archive() -> None:
+    """Test adding an archive to the metadata store."""
+    store = MetadataStore(':memory:')
+    store.initialize()
+
+    store.add_archive(
+        id="test-id",
+        original_path="/path/to/file",
+        version=1,
+        timestamp=datetime.now(),
+        hash="test-hash",
+        row_count=100,
+        schema={},
+        compression_ratio=0.5,
+        storage_path="/path/to/archive"
+    )
+
+    # Verify the archive was added
+    conn = duckdb.connect(store.db_path)
+    result = conn.execute("SELECT * FROM archives WHERE id = 'test-id';").fetchone()
+    assert result is not None

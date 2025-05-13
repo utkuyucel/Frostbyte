@@ -13,12 +13,12 @@ from frostbyte.cli.commands import cli
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Provides a CliRunner instance for testing CLI commands."""
     return CliRunner()
 
 
-def test_cli_init(cli_runner, tmp_path):
+def test_cli_init(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Test initializing a Frostbyte repository."""
     with cli_runner.isolated_filesystem():
         # Run the init command
@@ -34,7 +34,7 @@ def test_cli_init(cli_runner, tmp_path):
         assert os.path.exists('.frostbyte/manifest.db')
 
 
-def test_cli_archive_and_restore(cli_runner, sample_csv):
+def test_cli_archive_and_restore(cli_runner: CliRunner, sample_csv: str) -> None:
     """Test archiving and restoring a file."""
     with cli_runner.isolated_filesystem():
         # First initialize
@@ -67,7 +67,7 @@ def test_cli_archive_and_restore(cli_runner, sample_csv):
         assert os.path.exists(sample_path)
 
 
-def test_cli_ls(cli_runner, sample_csv):
+def test_cli_ls(cli_runner: CliRunner, sample_csv: str) -> None:
     """Test listing archived files."""
     with cli_runner.isolated_filesystem():
         # First initialize
@@ -96,7 +96,7 @@ def test_cli_ls(cli_runner, sample_csv):
         assert "sample.csv" in result_all.output
 
 
-def test_cli_stats(cli_runner, sample_csv):
+def test_cli_stats(cli_runner: CliRunner, sample_csv: str) -> None:
     """Test getting statistics about archives."""
     with cli_runner.isolated_filesystem():
         # First initialize
@@ -124,7 +124,7 @@ def test_cli_stats(cli_runner, sample_csv):
         assert "Statistics for" in result_file.output
 
 
-def test_cli_diff(cli_runner, sample_csv):
+def test_cli_diff(cli_runner: CliRunner, sample_csv: str) -> None:
     """Test diffing two versions of a file."""
     with cli_runner.isolated_filesystem():
         # First initialize
@@ -156,7 +156,7 @@ def test_cli_diff(cli_runner, sample_csv):
         assert "Rows added" in result.output
 
 
-def test_cli_purge(cli_runner, sample_csv):
+def test_cli_purge(cli_runner: CliRunner, sample_csv: str) -> None:
     """Test purging archive versions."""
     with cli_runner.isolated_filesystem():
         # First initialize
@@ -197,7 +197,7 @@ def test_cli_purge(cli_runner, sample_csv):
         assert "Removed all versions" in result_all.output
 
 
-def test_cli_gui(cli_runner):
+def test_cli_gui(cli_runner: CliRunner) -> None:
     """Test gui command."""
     result = cli_runner.invoke(cli, ['gui'])
     

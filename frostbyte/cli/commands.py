@@ -5,6 +5,7 @@ This module provides the command implementations for the Frostbyte CLI.
 """
 
 import click
+from pathlib import Path
 from tabulate import tabulate
 import sys
 
@@ -13,7 +14,7 @@ import frostbyte
 
 @click.group()
 @click.version_option(version=frostbyte.__version__)
-def cli():
+def cli() -> None:
     """
     Frostbyte: Cold Data Archiving for Pandas Workflows.
 
@@ -24,9 +25,18 @@ def cli():
 
 
 @cli.command('init')
-def init_cmd():
+def init_cmd() -> None:
     """Initialize project, create .frostbyte/ directory. Recreates database if it exists."""
     try:
+        # Check if the .frostbyte directory already exists
+        if Path('.frostbyte').exists():
+            if not click.confirm(
+                click.style("⚠️  WARNING: Frostbyte is already initialized. This will delete all archives and reset the database. Continue?", fg="yellow"),
+                default=False
+            ):
+                click.echo(click.style("Initialization aborted", fg="blue"))
+                return
+            
         result = frostbyte.init()
         if result:
             click.echo(click.style("✓ Frostbyte initialized successfully", fg="green"))
@@ -41,7 +51,7 @@ def init_cmd():
 
 @cli.command('archive')
 @click.argument('path', required=True, type=click.Path(exists=True))
-def archive_cmd(path):
+def archive_cmd(path: str) -> None:
     """Compress file, record metadata."""
     try:
         result = frostbyte.archive(path)
@@ -56,7 +66,7 @@ def archive_cmd(path):
 
 @cli.command('restore')
 @click.argument('path_spec', required=True)
-def restore_cmd(path_spec):
+def restore_cmd(path_spec: str) -> None:
     """Decompress and restore original file.
     
     PATH_SPEC can be a file path with an optional version (e.g., data/file.csv@2).
@@ -74,7 +84,7 @@ def restore_cmd(path_spec):
 
 @cli.command('ls')
 @click.option('--all', '-a', 'show_all', is_flag=True, help="Show all versions with detailed information (creation date, file sizes, archive filenames)")
-def list_cmd(show_all):
+def list_cmd(show_all: bool) -> None:
     """List archived files and versions.
     
     Without --all: Shows summary information with latest version and total stats.
@@ -149,29 +159,11 @@ def list_cmd(show_all):
 
 
 @cli.command('stats')
-@click.argument('file_path', required=False)
-def stats_cmd(file_path):
-    """Show size savings, last access, total versions."""
+def stats_cmd() -> None:
+    """Display statistics about archived files."""
     try:
-        result = frostbyte.stats(file_path)
-        
-        if not result:
-            click.echo("No statistics available.")
-            return
-        
-        if file_path:
-            # Stats for a specific file
-            click.echo(f"Statistics for: {result['original_path']}")
-            click.echo(f"  Versions: {result['versions']}")
-            click.echo(f"  Latest version: {result['latest_version']}")
-            click.echo(f"  Last modified: {result['last_modified'].strftime('%Y-%m-%d %H:%M:%S')}")
-            click.echo(f"  Size saved: {result['size_saved'] / 1024 / 1024:.2f} MB")
-        else:
-            # Overall stats
-            click.echo("Overall Statistics:")
-            click.echo(f"  Total archives: {result['total_archives']}")
-            click.echo(f"  Total size saved: {result['total_size_saved']:.2f} MB")
-            click.echo(f"  Average compression ratio: {result['avg_compression_ratio']:.2f}%")
+        stats_result = frostbyte.stats()
+        click.echo(tabulate(stats_result, headers='keys'))
     except Exception as e:
         click.echo(click.style(f"✗ Error: {str(e)}", fg="red"))
         sys.exit(1)
@@ -181,7 +173,7 @@ def stats_cmd(file_path):
 @click.argument('file_path', required=True)
 @click.option('--all', '-a', 'all_versions', is_flag=True, 
               help="Remove all versions of the file")
-def purge_cmd(file_path, all_versions):
+def purge_cmd(file_path: str, all_versions: bool) -> None:
     """Remove archive versions or entire file from storage."""
     try:
         result = frostbyte.purge(file_path, all_versions)

@@ -3,9 +3,8 @@ Tests for the Frostbyte ArchiveManager class.
 """
 
 import os
-import shutil
 import tempfile
-from pathlib import Path
+from typing import Generator
 
 import pandas as pd
 import pytest
@@ -14,7 +13,7 @@ from frostbyte.core.manager import ArchiveManager
 
 
 @pytest.fixture
-def temp_workspace():
+def temp_workspace() -> Generator[str, None, None]:
     """Create a temporary workspace for testing."""
     old_cwd = os.getcwd()
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -24,7 +23,7 @@ def temp_workspace():
 
 
 @pytest.fixture
-def sample_csv(temp_workspace):
+def sample_csv(temp_workspace: str) -> str:
     """Create a sample CSV file for testing."""
     data = {
         'id': range(100),
@@ -43,7 +42,7 @@ def sample_csv(temp_workspace):
     return file_path
 
 
-def test_initialize(temp_workspace):
+def test_initialize(temp_workspace: str) -> None:
     """Test initializing a new Frostbyte repository."""
     manager = ArchiveManager()
     result = manager.initialize()
@@ -54,7 +53,7 @@ def test_initialize(temp_workspace):
     assert os.path.exists('.frostbyte/manifest.db')
 
 
-def test_archive_restore(temp_workspace, sample_csv):
+def test_archive_restore(temp_workspace: str, sample_csv: str) -> None:
     """Test archiving and restoring a file."""
     manager = ArchiveManager()
     manager.initialize()
@@ -64,7 +63,7 @@ def test_archive_restore(temp_workspace, sample_csv):
     
     assert archive_result['original_path'] == sample_csv
     assert archive_result['version'] == 1
-    assert os.path.exists(os.path.join('.frostbyte', 'archives', f"sample_v1.csv.fbyt"))
+    assert os.path.exists(os.path.join('.frostbyte', 'archives', 'sample_v1.csv.fbyt'))
     
     # Delete the original file
     os.remove(sample_csv)
@@ -85,7 +84,7 @@ def test_archive_restore(temp_workspace, sample_csv):
     assert 'name' in df.columns
 
 
-def test_list_archives(temp_workspace, sample_csv):
+def test_list_archives(temp_workspace: str, sample_csv: str) -> None:
     """Test listing archive files."""
     manager = ArchiveManager()
     manager.initialize()
@@ -113,7 +112,7 @@ def test_list_archives(temp_workspace, sample_csv):
     assert archives[1]['version'] == 2
 
 
-def test_purge(temp_workspace, sample_csv):
+def test_purge(temp_workspace: str, sample_csv: str) -> None:
     """Test purging archive files."""
     manager = ArchiveManager()
     manager.initialize()
@@ -146,3 +145,27 @@ def test_purge(temp_workspace, sample_csv):
     # Confirm all versions are gone
     archives = manager.list_archives()
     assert len(archives) == 0
+
+
+def test_manager_initialization() -> None:
+    """Test initializing the archive manager."""
+    manager = ArchiveManager()
+    assert manager.base_dir.exists()
+
+
+def test_manager_archive_and_restore() -> None:
+    """Test archiving and restoring a file using the manager."""
+    manager = ArchiveManager()
+    manager.initialize()
+
+    # Archive a file
+    file_path = "test_file.csv"
+    with open(file_path, "w") as f:
+        f.write("id,value\n1,100\n2,200")
+
+    archive_info = manager.archive(file_path)
+    assert archive_info["version"] == 1
+
+    # Restore the file
+    restored_info = manager.restore(f"{file_path}@1")
+    assert restored_info["original_path"] == file_path

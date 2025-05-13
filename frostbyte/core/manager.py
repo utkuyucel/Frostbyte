@@ -63,21 +63,22 @@ class ArchiveManager:
         Returns:
             Dict: Information about the archived file.
         """
-        file_path = Path(file_path).resolve()
+        file_path_obj = Path(file_path).resolve()
+        file_path_str = str(file_path_obj)
         
         # Get file information
-        file_hash = get_file_hash(file_path)
-        original_size = get_file_size(file_path)
+        file_hash = get_file_hash(file_path_obj)
+        original_size = get_file_size(file_path_obj)
         
         # Extract schema and statistics
-        schema = extract_schema(file_path)
+        schema = extract_schema(file_path_obj)
         row_count = schema.get('row_count', 0)
         
         # Get the next version number
-        version = self.store.get_next_version(str(file_path))
+        version = self.store.get_next_version(file_path_str)
         
         # Create archive name
-        archive_name = f"{file_path.stem}_v{version}{file_path.suffix}.fbyt"
+        archive_name = f"{file_path_obj.stem}_v{version}{file_path_obj.suffix}.fbyt"
         archive_path = self.archives_dir / archive_name
         
         # Compress the file
@@ -88,7 +89,7 @@ class ArchiveManager:
         archive_id = str(uuid.uuid4())
         self.store.add_archive(
             id=archive_id,
-            original_path=str(file_path),
+            original_path=file_path_str,
             version=version,
             timestamp=datetime.now(),
             hash=file_hash,
@@ -184,7 +185,7 @@ class ArchiveManager:
             path = file_path
             version = None  # Use latest if not all_versions
             
-        result = self.store.remove_archives(path, version, all_versions)
+        result = self.store.remove_archives(path, int(version) if version is not None else None, all_versions)
         
         # Remove physical files
         for archive_path in result.get('storage_paths', []):

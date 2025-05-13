@@ -11,7 +11,7 @@ import pytest
 from frostbyte.core.compressor import Compressor
 
 
-def test_compress_decompress():
+def test_compress_decompress() -> None:
     """Test that a file can be compressed and decompressed correctly."""
     # Create a temporary test file
     test_content = b"This is a test file content for compression testing."

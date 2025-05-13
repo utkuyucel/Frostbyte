@@ -79,13 +79,24 @@ frostbyte restore data/cleaned.csv
    frostbyte stats data/experiment.csv
    ```
 
+### Data Versioning Workflow
+
+For a comprehensive guide on how to use Frostbyte for data versioning, including:
+- Creating multiple versions of a dataset
+- Listing and reviewing version history
+- Getting statistics about your archives
+- Restoring specific versions
+- Handling branching workflows
+
+See our detailed [Data Versioning with Frostbyte](docs/versioning-workflow.md) guide.
+
 
 
 ## Command Reference
 
 | Command                     | Description                                          |
 |-----------------------------|------------------------------------------------------|
-| `frostbyte init`            | Initialize project, create `.frostbyte/` directory (recreates DB if exists) |
+| `frostbyte init`            | Initialize project, create `.frostbyte/` directory (**CAUTION**: recreates DB if exists, requires confirmation) |
 | `frostbyte archive <path>`  | Compress file, record metadata                       |
 | `frostbyte restore <path>`  | Decompress and restore original file                 |
 | `frostbyte ls`              | List summary of archived files with latest versions  |
@@ -93,7 +104,7 @@ frostbyte restore data/cleaned.csv
 | `frostbyte stats [<file>]`  | Show size savings, last access, total versions       |
 | `frostbyte purge <file>`    | Remove archive versions or entire file from storage  |
 
-Check the [examples directory](examples/) for more detailed usage examples.
+Check the [docs directory](docs/) for guides and the [examples directory](examples/) for code samples and usage examples.
 
 ## Development
 

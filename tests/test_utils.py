@@ -13,7 +13,7 @@ from frostbyte.utils.file_utils import get_file_hash, get_file_size
 from frostbyte.utils.schema import extract_schema
 
 
-def test_file_hash():
+def test_file_hash() -> None:
     """Test generating file hash."""
     # Create a temporary test file
     test_content = b"This is a test file for hashing."
@@ -39,7 +39,7 @@ def test_file_hash():
         os.remove(file_path)
 
 
-def test_file_size():
+def test_file_size() -> None:
     """Test getting file size."""
     # Create a temporary test file
     test_content = b"This is a test file for size measurement."
@@ -60,7 +60,7 @@ def test_file_size():
         os.remove(file_path)
 
 
-def test_extract_schema_csv():
+def test_extract_schema_csv() -> None:
     """Test schema extraction from CSV."""
     # Create a temporary CSV file
     data = {

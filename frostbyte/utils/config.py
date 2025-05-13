@@ -7,10 +7,10 @@ Handles reading, writing, and validating Frostbyte configuration.
 import os
 import yaml
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 
-DEFAULT_CONFIG = {
+DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
     'storage': {
         'type': 'local',
         'compression_level': 3,
@@ -42,10 +42,10 @@ class Config:
         else:
             self.config_path = Path('.frostbyte') / 'config.yaml'
         
-        self.config = DEFAULT_CONFIG.copy()
+        self.config: Dict[str, Dict[str, Any]] = DEFAULT_CONFIG.copy()
         self._load()
     
-    def _load(self):
+    def _load(self) -> None:
         """Load configuration from file if it exists."""
         if self.config_path.exists():
             try:
@@ -63,14 +63,14 @@ class Config:
             except Exception as e:
                 print(f"Warning: Failed to load config from {self.config_path}: {e}")
     
-    def save(self):
+    def save(self) -> None:
         """Save current configuration to file."""
         self.config_path.parent.mkdir(exist_ok=True)
         
         with open(self.config_path, 'w') as f:
             yaml.dump(self.config, f, default_flow_style=False)
     
-    def get(self, section: str, key: str, default=None):
+    def get(self, section: str, key: str, default: Any = None) -> Any:
         """
         Get a configuration value.
         
@@ -84,7 +84,7 @@ class Config:
         """
         return self.config.get(section, {}).get(key, default)
     
-    def set(self, section: str, key: str, value):
+    def set(self, section: str, key: str, value: Any) -> None:
         """
         Set a configuration value.
         
@@ -100,16 +100,16 @@ class Config:
     
     def get_compression_level(self) -> int:
         """Get the compression level."""
-        return self.get('storage', 'compression_level', 3)
+        return int(self.get('storage', 'compression_level', 3))
     
     def get_chunk_size(self) -> int:
         """Get the chunk size for reading/writing files."""
-        return self.get('storage', 'chunk_size', 1048576)
+        return int(self.get('storage', 'chunk_size', 1048576))
     
     def get_database_type(self) -> str:
         """Get the database type."""
-        return self.get('database', 'type', 'duckdb')
+        return str(self.get('database', 'type', 'duckdb'))
     
     def get_database_path(self) -> str:
         """Get the database path."""
-        return self.get('database', 'path', '.frostbyte/manifest.db')
+        return str(self.get('database', 'path', '.frostbyte/manifest.db'))
