@@ -4,12 +4,12 @@ Schema extraction functionality for Frostbyte.
 
 import os
 from pathlib import Path
-from typing import Dict, Union
+from typing import Dict, Union, Any
 
 import pandas as pd
 
 
-def extract_schema(file_path: Union[str, Path]) -> Dict:
+def extract_schema(file_path: Union[str, Path]) -> Dict[str, Any]:
     """
     Extract schema information from a CSV or Parquet file.
     
@@ -17,7 +17,7 @@ def extract_schema(file_path: Union[str, Path]) -> Dict:
         file_path: Path to the file
         
     Returns:
-        Dict: Schema information including column types, stats, etc.
+        Dict[str, Any]: Schema information including column types, stats, etc.
     """
     file_path = Path(file_path)
     
@@ -43,7 +43,7 @@ def extract_schema(file_path: Union[str, Path]) -> Dict:
             raise ValueError(f"Unsupported file type: {file_ext}")
         
         # Build schema information
-        schema = {
+        schema: Dict[str, Any] = {
             'row_count': row_count,
             'column_count': len(df.columns),
             'columns': {},
@@ -76,5 +76,7 @@ def extract_schema(file_path: Union[str, Path]) -> Dict:
             'row_count': 0,
             'column_count': 0,
             'columns': {},
+            'file_size_bytes': 0,
+            'avg_row_bytes': 0,
             'error': str(e)
         }

@@ -58,7 +58,7 @@ def archive_cmd(path: str) -> None:
         result = frostbyte.archive(path)
         
         # Format file sizes for display
-        def format_size(size_bytes):
+        def format_size(size_bytes: float) -> str:
             if size_bytes >= 1024 * 1024 * 1024:  # GB
                 return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
             elif size_bytes >= 1024 * 1024:  # MB
