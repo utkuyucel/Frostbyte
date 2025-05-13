@@ -153,10 +153,56 @@ class ArchiveManager:
         
         self.compressor.decompress(storage_path, original_path)
         
+        # Calculate or extract file sizes
+        schema = archive_info.get('schema', {})
+        if isinstance(schema, str):
+            import json
+            schema = json.loads(schema)
+            
+        # Get the compression ratio
+        compression_ratio = archive_info.get('compression_ratio', 0)
+        
+        # Calculate original file size - either from schema or from the actual file
+        original_size = 0
+        if schema:
+            # Try to get size from schema
+            if 'file_size_bytes' in schema:
+                original_size = schema.get('file_size_bytes', 0)
+            elif 'row_count' in schema and 'avg_row_bytes' in schema:
+                original_size = schema['row_count'] * schema['avg_row_bytes']
+        
+        # If we couldn't get the original size from schema, try getting it from disk
+        if not original_size:
+            # Get the storage path and try to calculate size from it
+            storage_path = Path(archive_info['storage_path'])
+            if storage_path.exists():
+                storage_size = storage_path.stat().st_size
+                # If we have compression ratio, estimate original size
+                if compression_ratio:
+                    if compression_ratio != 100:  # avoid division by zero
+                        original_size = storage_size / (1 - compression_ratio / 100)
+                    else:
+                        original_size = storage_size  # placeholder for 100% compression
+                else:
+                    original_size = storage_size
+        
+        # Calculate compressed size
+        compressed_size = 0
+        if original_size:
+            if compression_ratio >= 0:
+                # Normal case - positive compression ratio
+                compressed_size = original_size * (1 - compression_ratio / 100)
+            else:
+                # Negative compression ratio case (file got bigger)
+                compressed_size = original_size * (1 + abs(compression_ratio) / 100)
+        
         return {
             'original_path': str(original_path),
             'version': archive_info['version'],
-            'timestamp': archive_info['timestamp']
+            'timestamp': archive_info['timestamp'],
+            'original_size': original_size,
+            'compressed_size': compressed_size,
+            'compression_ratio': compression_ratio
         }
     
     def list_archives(self, show_all: bool = False) -> List[Dict]:

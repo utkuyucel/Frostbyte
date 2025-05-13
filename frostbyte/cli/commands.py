@@ -66,7 +66,8 @@ def archive_cmd(path: str) -> None:
             elif size_bytes >= 1024:  # KB
                 return f"{size_bytes / 1024:.2f} KB"
             else:
-                return f"{size_bytes} bytes"
+                # For smaller sizes, round to nearest integer
+                return f"{int(round(size_bytes))} bytes"
         
         # Get file sizes from result
         original_size = result.get('original_size', 0)
@@ -98,9 +99,28 @@ def restore_cmd(path_spec: str) -> None:
     """
     try:
         result = frostbyte.restore(path_spec)
+        
+        # Format file sizes for display
+        def format_size(size_bytes: float) -> str:
+            if size_bytes >= 1024 * 1024 * 1024:  # GB
+                return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
+            elif size_bytes >= 1024 * 1024:  # MB
+                return f"{size_bytes / (1024 * 1024):.2f} MB"
+            elif size_bytes >= 1024:  # KB
+                return f"{size_bytes / 1024:.2f} KB"
+            else:
+                # For smaller sizes, round to nearest integer
+                return f"{int(round(size_bytes))} bytes"
+        
+        original_size = result.get('original_size', 0)
+        compressed_size = result.get('compressed_size', 0)
+        
         click.echo(click.style(f"✓ Restored: {result['original_path']}", fg="green"))
         click.echo(f"  Version: {result['version']}")
         click.echo(f"  Timestamp: {result['timestamp']}")
+        click.echo(f"  Original size: {format_size(original_size)}")
+        click.echo(f"  Compressed size: {format_size(compressed_size)}")
+        click.echo(f"  Compression ratio: {result.get('compression_ratio', 0):.1f}%")
     except Exception as e:
         click.echo(click.style(f"✗ Error: {str(e)}", fg="red"))
         sys.exit(1)
