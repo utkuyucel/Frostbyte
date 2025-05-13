@@ -98,7 +98,7 @@ See our detailed [Data Versioning with Frostbyte](docs/versioning-workflow.md) g
 |-----------------------------|------------------------------------------------------|
 | `frostbyte init`            | Initialize project, create `.frostbyte/` directory (**CAUTION**: recreates DB if exists, requires confirmation) |
 | `frostbyte archive <path>`  | Compress file, record metadata                       |
-| `frostbyte restore <path>`  | Decompress and restore original file                 |
+| `frostbyte restore <path>[@version]` | Decompress and restore file (e.g., `data.csv` or `data.csv@2`) |
 | `frostbyte ls`              | List summary of archived files with latest versions  |
 | `frostbyte ls --all`        | List all versions with detailed info (date, size, filename) |
 | `frostbyte stats [<file>]`  | Show size savings, last access, total versions       |

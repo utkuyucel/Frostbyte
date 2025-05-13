@@ -81,6 +81,8 @@ $ frostbyte ls --all
 │ customer_data.csv│ 3       │ 2025-05-13 10:22:33 │ 48.7 MB │ 14.5 MB    │ 70.2% │
 ```
 
+> **Tip:** Use the "Original Path" and "Version" from this table to construct your restore commands. For example, to restore version 2 of customer_data.csv, you would use: `frostbyte restore customer_data.csv@2`
+
 Get detailed statistics about your archived files:
 
 ```bash
@@ -96,10 +98,38 @@ $ frostbyte stats customer_data.csv
 
 If you discover an issue with your current version, you can restore a previous one:
 
+#### Restore Command Syntax
+
+The `restore` command has the following syntax:
+
 ```bash
-# Restore version 2 instead of using the latest version
+frostbyte restore <path_spec>
+```
+
+Where `<path_spec>` can be in one of these formats:
+
+- **Path only** (restores the latest version):  
+  `frostbyte restore customer_data.csv`
+
+- **Path with version** (restores a specific version):  
+  `frostbyte restore customer_data.csv@2`
+
+> **Note:** Always use the original file path, not the archive file name. Frostbyte keeps track of all versions by their original path.
+
+#### Restore Examples
+
+```bash
+# Restore the latest version
+$ frostbyte restore customer_data.csv
+✅ Restored customer_data.csv (latest) to customer_data.csv
+
+# Restore version 2 specifically
 $ frostbyte restore customer_data.csv@2
 ✅ Restored customer_data.csv (v2) to customer_data.csv
+
+# For files in subdirectories, include the relative or absolute path
+$ frostbyte restore data/raw/customer_data.csv@1
+✅ Restored data/raw/customer_data.csv (v1) to data/raw/customer_data.csv
 
 # Verify it's the right version
 $ head -n 3 customer_data.csv
@@ -156,8 +186,15 @@ If a data processing pipeline introduces errors:
 ```bash
 # Identify the last good version
 $ frostbyte ls --all
-# Restore that version
+│ Original Path    │ Version │ Date                │ Size    │ Compressed │ Ratio │
+│--------------------------------------------------------------------------------│
+│ customer_data.csv│ 1       │ 2025-05-10 14:32:15 │ 42.5 MB │ 12.8 MB    │ 70.1% │
+│ customer_data.csv│ 2       │ 2025-05-11 09:15:47 │ 43.2 MB │ 13.1 MB    │ 69.7% │ <- Last known good version
+│ customer_data.csv│ 3       │ 2025-05-13 10:22:33 │ 48.7 MB │ 14.5 MB    │ 70.2% │ <- Problematic version
+
+# Restore the specific version (use the path + @version syntax)
 $ frostbyte restore customer_data.csv@2
+✅ Restored customer_data.csv (v2) to customer_data.csv
 ```
 
 ### Creating a Dataset Branch
@@ -165,8 +202,11 @@ $ frostbyte restore customer_data.csv@2
 To experiment without affecting the main dataset:
 
 ```bash
-# Restore a specific version to a new file
-$ frostbyte restore customer_data.csv@2 --output experiment.csv
+# Restore a specific version to a different output file
+# (Note: Optional --output flag not yet implemented in current version)
+$ frostbyte restore customer_data.csv@2
+$ cp customer_data.csv experiment.csv
+
 # Make changes and archive as a new file
 $ python transform.py experiment.csv
 $ frostbyte archive experiment.csv
