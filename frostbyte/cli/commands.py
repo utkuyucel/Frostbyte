@@ -8,6 +8,7 @@ import click
 from pathlib import Path
 from tabulate import tabulate
 import sys
+from typing import Optional
 
 import frostbyte
 
@@ -55,9 +56,27 @@ def archive_cmd(path: str) -> None:
     """Compress file, record metadata."""
     try:
         result = frostbyte.archive(path)
+        
+        # Format file sizes for display
+        def format_size(size_bytes):
+            if size_bytes >= 1024 * 1024 * 1024:  # GB
+                return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
+            elif size_bytes >= 1024 * 1024:  # MB
+                return f"{size_bytes / (1024 * 1024):.2f} MB"
+            elif size_bytes >= 1024:  # KB
+                return f"{size_bytes / 1024:.2f} KB"
+            else:
+                return f"{size_bytes} bytes"
+        
+        # Get file sizes from result
+        original_size = result.get('original_size', 0)
+        compressed_size = result.get('compressed_size', 0)
+        
         click.echo(click.style(f"✓ Archived: {result['original_path']}", fg="green"))
         click.echo(f"  Version: {result['version']}")
         click.echo(f"  Archive: {result['archive_name']}")
+        click.echo(f"  Original size: {format_size(original_size)}")
+        click.echo(f"  Compressed size: {format_size(compressed_size)}")
         click.echo(f"  Compression ratio: {result['compression_ratio']:.2f}%")
     except Exception as e:
         click.echo(click.style(f"✗ Error: {str(e)}", fg="red"))
@@ -159,11 +178,39 @@ def list_cmd(show_all: bool) -> None:
 
 
 @cli.command('stats')
-def stats_cmd() -> None:
-    """Display statistics about archived files."""
+@click.argument('file_path', required=False)
+def stats_cmd(file_path: Optional[str] = None) -> None:
+    """Display statistics about archived files. Optional: provide a file path to see stats for a specific file."""
     try:
-        stats_result = frostbyte.stats()
-        click.echo(tabulate(stats_result, headers='keys'))
+        stats_result = frostbyte.stats(file_path)
+        if stats_result:
+            # Format size values for better readability
+            for key in stats_result:
+                if 'size' in key.lower() and isinstance(stats_result[key], (int, float)):
+                    size_bytes = stats_result[key]
+                    if size_bytes > 1024 * 1024 * 1024:  # More than 1 GB
+                        stats_result[key] = f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
+                    elif size_bytes > 1024 * 1024:  # More than 1 MB
+                        stats_result[key] = f"{size_bytes / (1024 * 1024):.2f} MB"
+                    elif size_bytes > 1024:  # More than 1 KB
+                        stats_result[key] = f"{size_bytes / 1024:.2f} KB"
+                    else:
+                        stats_result[key] = f"{size_bytes:.0f} bytes"
+            
+            # Rename keys for better readability
+            if 'total_size_saved' in stats_result:
+                stats_result['Total Size Saved'] = stats_result.pop('total_size_saved')
+            if 'total_archives' in stats_result:
+                stats_result['Total Archives'] = stats_result.pop('total_archives')
+            if 'avg_compression_ratio' in stats_result:
+                stats_result['Avg Compression'] = f"{stats_result.pop('avg_compression_ratio'):.1f}%"
+            if 'size_saved' in stats_result:
+                stats_result['Size Saved'] = stats_result.pop('size_saved')
+            
+            click.echo(click.style("✓ Archive Statistics:", fg="green"))
+            click.echo(tabulate([stats_result], headers='keys'))
+        else:
+            click.echo("No archives found.")
     except Exception as e:
         click.echo(click.style(f"✗ Error: {str(e)}", fg="red"))
         sys.exit(1)

@@ -210,8 +210,10 @@ class MetadataStore:
             if show_all:
                 query = """
                 SELECT a.*, 
-                       (json_extract(a.schema, '$.row_count') :: INT) * (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT) AS original_size_bytes,
-                       (json_extract(a.schema, '$.row_count') :: INT) * (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT) * (1 - a.compression_ratio / 100) AS compressed_size_bytes,
+                       COALESCE(json_extract(a.schema, '$.file_size_bytes') :: INT, 
+                                (json_extract(a.schema, '$.row_count') :: INT) * (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT)) AS original_size_bytes,
+                       COALESCE(json_extract(a.schema, '$.file_size_bytes') :: INT, 
+                                (json_extract(a.schema, '$.row_count') :: INT) * (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT)) * (1 - a.compression_ratio / 100) AS compressed_size_bytes,
                        SPLIT_PART(a.storage_path, '/', -1) AS archive_filename
                 FROM archives a
                 ORDER BY a.original_path, a.version
@@ -224,8 +226,10 @@ class MetadataStore:
                        MAX(a.version) AS latest_version,
                        COUNT(*) AS version_count,
                        MAX(a.timestamp) AS last_modified,
-                       SUM((json_extract(a.schema, '$.row_count') :: INT) * (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT)) AS total_size_bytes,
-                       SUM((json_extract(a.schema, '$.row_count') :: INT) * (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT) * (1 - a.compression_ratio / 100)) AS total_compressed_bytes,
+                       SUM(COALESCE(json_extract(a.schema, '$.file_size_bytes') :: INT, 
+                                   (json_extract(a.schema, '$.row_count') :: INT) * (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT))) AS total_size_bytes,
+                       SUM(COALESCE(json_extract(a.schema, '$.file_size_bytes') :: INT, 
+                                   (json_extract(a.schema, '$.row_count') :: INT) * (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT)) * (1 - a.compression_ratio / 100)) AS total_compressed_bytes,
                        AVG(a.compression_ratio) AS avg_compression
                 FROM archives a
                 GROUP BY a.original_path
@@ -258,15 +262,17 @@ class MetadataStore:
         conn = duckdb.connect(str(self.db_path))
         
         try:
+            # Convert to absolute path if file_path is provided
             if file_path:
+                file_path = str(Path(file_path).resolve())
                 # Stats for specific file
                 query = """
                 SELECT a.original_path,
                        COUNT(*) AS versions,
                        MAX(a.version) AS latest_version,
                        MAX(a.timestamp) AS last_modified,
-                       SUM((1 - a.compression_ratio / 100) * a.row_count * 
-                           (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT)) AS size_saved
+                       SUM((1 - a.compression_ratio / 100) * COALESCE(json_extract(a.schema, '$.file_size_bytes') :: INT, 
+                           a.row_count * (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT))) AS size_saved
                 FROM archives a
                 WHERE a.original_path = ?
                 GROUP BY a.original_path
@@ -282,8 +288,8 @@ class MetadataStore:
                 # Overall stats
                 query = """
                 SELECT COUNT(*) AS total_archives,
-                       SUM((1 - a.compression_ratio / 100) * a.row_count * 
-                           (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT)) / 1024 / 1024 AS total_size_saved,
+                       SUM((1 - a.compression_ratio / 100) * COALESCE(json_extract(a.schema, '$.file_size_bytes') :: INT, 
+                           a.row_count * (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT))) AS total_size_saved,
                        AVG(a.compression_ratio) AS avg_compression_ratio
                 FROM archives a
                 """

@@ -104,6 +104,8 @@ class ArchiveManager:
             'original_path': str(file_path),
             'version': version,
             'archive_name': archive_name,
+            'original_size': original_size,
+            'compressed_size': compressed_size,
             'compression_ratio': compression_ratio
         }
     

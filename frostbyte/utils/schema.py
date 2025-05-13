@@ -25,20 +25,30 @@ def extract_schema(file_path: Union[str, Path]) -> Dict:
     file_ext = file_path.suffix.lower()
     
     try:
+        # Get the actual file size in bytes
+        actual_file_size = os.path.getsize(file_path)
+        
         # Read first few rows to infer schema
         if file_ext == '.csv':
+            # For CSV, we'll count total rows first
+            with open(file_path, 'r') as f:
+                row_count = sum(1 for _ in f)
+            
+            # Then sample to determine column types
             df = pd.read_csv(file_path, nrows=100)
         elif file_ext in ('.parquet', '.pq'):
             df = pd.read_parquet(file_path)
+            row_count = len(df)
         else:
             raise ValueError(f"Unsupported file type: {file_ext}")
         
         # Build schema information
         schema = {
-            'row_count': len(df),
+            'row_count': row_count,
             'column_count': len(df.columns),
             'columns': {},
-            'avg_row_bytes': df.memory_usage(deep=True).sum() / max(1, len(df))
+            'file_size_bytes': actual_file_size,
+            'avg_row_bytes': actual_file_size / max(1, row_count)
         }
         
         # Add column metadata
