@@ -12,28 +12,39 @@ import duckdb
 
 from frostbyte.utils.json_utils import json_dumps
 
-
 class MetadataStore:
     """Handles database interactions for Frostbyte metadata."""
 
     def __init__(self, db_path: Union[str, Path]):
         """Initialize the metadata store with database path."""
         self.db_path = Path(db_path)
+        # For in-memory databases, keep one persistent connection
+        if str(self.db_path) == ":memory:":
+            self._conn = duckdb.connect()
+        else:
+            self._conn = None
+
+    def _connect(self):
+        """Return a connection: persistent for memory, new for file."""
+        if self._conn:
+            return self._conn
+        return duckdb.connect(str(self.db_path))
 
     def initialize(self) -> None:
         """Create the database schema, deleting any existing database."""
-        if self.db_path.exists():
+        # Remove existing file if on disk
+        if self._conn is None and self.db_path.exists():
             self.db_path.unlink()
+        # Ensure parent dir exists
+        if self._conn is None:
+            self.db_path.parent.mkdir(exist_ok=True)
 
-        self.db_path.parent.mkdir(exist_ok=True)
-
-        conn = duckdb.connect(str(self.db_path))
-
+        conn = self._connect()
         try:
             # Create archives table
             conn.execute(
                 """
-            CREATE TABLE archives (
+            CREATE TABLE IF NOT EXISTS archives (
                 id VARCHAR PRIMARY KEY,
                 original_path VARCHAR NOT NULL,
                 version INT NOT NULL,
@@ -48,11 +59,10 @@ class MetadataStore:
             )
             """
             )
-
             # Create stats table
             conn.execute(
                 """
-            CREATE TABLE stats (
+            CREATE TABLE IF NOT EXISTS stats (
                 archive_id VARCHAR NOT NULL,
                 column_name VARCHAR NOT NULL,
                 min DOUBLE,
@@ -64,10 +74,10 @@ class MetadataStore:
             )
             """
             )
-
             conn.commit()
         finally:
-            conn.close()
+            if self._conn is None:
+                conn.close()
 
     def add_archive(
         self,
@@ -83,8 +93,7 @@ class MetadataStore:
         original_extension: Optional[str] = None,
     ) -> None:
         """Add a new archive entry to the database with associated metadata."""
-        conn = duckdb.connect(str(self.db_path))
-
+        conn = self._connect()
         try:
             conn.execute(
                 """
@@ -106,8 +115,6 @@ class MetadataStore:
                     original_extension,
                 ),
             )
-
-            # Add column stats if available
             if schema and "columns" in schema:
                 for col_name, stats in schema["columns"].items():
                     if "stats" in stats:
@@ -126,17 +133,15 @@ class MetadataStore:
                                 stats["stats"].get("stddev"),
                             ),
                         )
-
             conn.commit()
         finally:
-            conn.close()
+            if self._conn is None:
+                conn.close()
 
     def get_next_version(self, file_path: str) -> int:
         """Get the next sequential version number for a file."""
-        # Normalize the file path to ensure consistent matching
         normalized_path = str(Path(file_path).resolve())
-        conn = duckdb.connect(str(self.db_path))
-
+        conn = self._connect()
         try:
             result = conn.execute(
                 """
@@ -146,100 +151,82 @@ class MetadataStore:
                 """,
                 (normalized_path,),
             ).fetchone()
-
             return int(result[0]) if result else 1
         finally:
-            conn.close()
+            if self._conn is None:
+                conn.close()
 
     def get_archive(
         self, file_path: str, version: Optional[Union[int, float]] = None
     ) -> Optional[Dict]:
         """Get information about an archived file, optionally by specific version."""
-        # Normalize the file path to ensure consistent matching
         normalized_path = str(Path(file_path).resolve())
-        conn = duckdb.connect(str(self.db_path))
-
+        conn = self._connect()
         try:
-            get_params: Union[Tuple[str, ...], Tuple[str, int]]
-
             if version is None:
-                get_query = """
+                query = """
                 SELECT * FROM archives
                 WHERE original_path = ?
                 ORDER BY version DESC
                 LIMIT 1
                 """
-                get_params = (normalized_path,)
+                params = (normalized_path,)
             else:
-                get_query = """
+                query = """
                 SELECT * FROM archives
                 WHERE original_path = ? AND version = ?
                 """
-                get_params = (normalized_path, int(version))
-
-            cursor = conn.execute(get_query, get_params)
+                params = (normalized_path, int(version))
+            cursor = conn.execute(query, params)
             result = cursor.fetchone()
-
-            # If no result with exact path, try to find by basename as a fallback
             if not result and "/" in normalized_path:
-                # Extract the basename
                 basename = Path(normalized_path).name
-
                 if version is None:
-                    fallback_query = """
+                    fallback = """
                     SELECT * FROM archives
                     WHERE SPLIT_PART(original_path, '/', -1) = ?
                     ORDER BY version DESC
                     LIMIT 1
                     """
-                    fallback_params = (basename,)
+                    fb_params = (basename,)
                 else:
-                    fallback_query = """
+                    fallback = """
                     SELECT * FROM archives
                     WHERE SPLIT_PART(original_path, '/', -1) = ? AND version = ?
                     """
-                    fallback_params = (basename, int(version))
-
-                cursor = conn.execute(fallback_query, fallback_params)
+                    fb_params = (basename, int(version))
+                cursor = conn.execute(fallback, fb_params)
                 result = cursor.fetchone()
-
-            if result and cursor.description is not None:
-                columns = [desc[0] for desc in cursor.description]
-                return {columns[i]: result[i] for i in range(len(columns))}
-
+            if result and cursor.description:
+                cols = [d[0] for d in cursor.description]
+                return {cols[i]: result[i] for i in range(len(cols))}
             return None
         finally:
-            conn.close()
+            if self._conn is None:
+                conn.close()
 
     def list_archives(self, show_all: bool = False) -> List[Dict]:
         """List archived files, optionally showing all versions."""
-        conn = duckdb.connect(str(self.db_path))
-
+        conn = self._connect()
         try:
             if show_all:
                 query = """
                 SELECT 
                     a.*,
-                    -- Calculate original size from schema or row_count * avg_row_bytes
                     COALESCE(
                         json_extract(a.schema, '$.file_size_bytes') :: INT,
                         (json_extract(a.schema, '$.row_count') :: INT) * 
                         (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT)
                     ) AS original_size_bytes,
-                    -- Calculate compressed size using compression ratio
                     COALESCE(
                         json_extract(a.schema, '$.file_size_bytes') :: INT,
                         (json_extract(a.schema, '$.row_count') :: INT) * 
                         (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT)
                     ) * (1 - a.compression_ratio / 100) AS compressed_size_bytes,
                     SPLIT_PART(a.storage_path, '/', -1) AS archive_filename
-                FROM 
-                    archives a
-                ORDER BY 
-                    a.original_path, a.version
+                FROM archives a
+                ORDER BY a.original_path, a.version
                 """
-                result_cursor = conn.execute(query)
-                results = result_cursor.fetchall() if result_cursor else []
             else:
                 query = """
                 SELECT 
@@ -247,7 +234,6 @@ class MetadataStore:
                     MAX(a.version) AS latest_version,
                     COUNT(*) AS version_count,
                     MAX(a.timestamp) AS last_modified,
-                    -- Calculate total original size
                     SUM(
                         COALESCE(
                             json_extract(a.schema, '$.file_size_bytes') :: INT,
@@ -255,7 +241,6 @@ class MetadataStore:
                             (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT)
                         )
                     ) AS total_size_bytes,
-                    -- Calculate total compressed size
                     SUM(
                         COALESCE(
                             json_extract(a.schema, '$.file_size_bytes') :: INT,
@@ -264,71 +249,52 @@ class MetadataStore:
                         ) * (1 - a.compression_ratio / 100)
                     ) AS total_compressed_bytes,
                     AVG(a.compression_ratio) AS avg_compression
-                FROM 
-                    archives a
-                GROUP BY 
-                    a.original_path
-                ORDER BY 
-                    a.original_path
+                FROM archives a
+                GROUP BY a.original_path
+                ORDER BY a.original_path
                 """
-                result_cursor = conn.execute(query)
-                results = result_cursor.fetchall() if result_cursor else []
-
-            if not results:
+            cursor = conn.execute(query)
+            rows = cursor.fetchall() if cursor else []
+            if not rows:
                 return []
-
-            # Get column names from the result cursor description
-            columns = (
-                [desc[0] for desc in result_cursor.description] if result_cursor.description else []
-            )
-
-            # Convert results to dictionaries
-            return [{columns[i]: row[i] for i in range(len(columns))} for row in results]
+            cols = [d[0] for d in cursor.description]
+            return [{cols[i]: row[i] for i in range(len(cols))} for row in rows]
         finally:
-            conn.close()
+            if self._conn is None:
+                conn.close()
 
     def get_stats(self, file_path: Optional[str] = None) -> Dict:
         """Get statistics about archived files, for specific file or all archives."""
-        conn = duckdb.connect(str(self.db_path))
-
+        conn = self._connect()
         try:
-            # Convert to absolute path if file_path is provided
             if file_path:
-                file_path = str(Path(file_path).resolve())
-                # Stats for specific file
+                path = str(Path(file_path).resolve())
                 query = """
                 SELECT 
                     a.original_path,
                     COUNT(*) AS versions,
                     MAX(a.version) AS latest_version,
                     MAX(a.timestamp) AS last_modified,
-                    -- Calculate total size saved using compression ratio
                     SUM(
                         (1 - a.compression_ratio / 100) * COALESCE(
                             json_extract(a.schema, '$.file_size_bytes') :: INT, 
                             a.row_count * (json_extract(a.schema, '$.avg_row_bytes') :: FLOAT)
                         )
                     ) AS size_saved
-                FROM 
-                    archives a
-                WHERE 
-                    a.original_path = ?
-                GROUP BY 
-                    a.original_path
+                FROM archives a
+                WHERE a.original_path = ?
+                GROUP BY a.original_path
                 """
-                result_cursor = conn.execute(query, (file_path,))
-                result = result_cursor.fetchone() if result_cursor else None
-
-                if result:
-                    columns = [desc[0] for desc in conn.description] if conn.description else []
-                    # Convert row to dictionary with column names as keys
-                    return dict(zip(columns, result))
+                cursor = conn.execute(query, (path,))
+                row = cursor.fetchone() if cursor else None
+                if row:
+                    cols = [d[0] for d in conn.description] if conn.description else []
+                    return dict(zip(cols, row))
                 return {}
-            # Overall stats
-            query = """
+            else:
+                query = """
                 SELECT 
                     COUNT(*) AS total_archives,
-                    -- Calculate total size saved from all archives
                     SUM(
                         (1 - a.compression_ratio / 100) * COALESCE(
                             json_extract(a.schema, '$.file_size_bytes') :: INT,
@@ -336,19 +302,17 @@ class MetadataStore:
                         )
                     ) AS total_size_saved,
                     AVG(a.compression_ratio) AS avg_compression_ratio
-                FROM 
-                    archives a
+                FROM archives a
                 """
-            result_cursor = conn.execute(query)
-            result = result_cursor.fetchone() if result_cursor else None
-
-            if result:
-                columns = [desc[0] for desc in conn.description] if conn.description else []
-                # Convert row to dictionary with column names as keys
-                return dict(zip(columns, result))
-            return {}
+                cursor = conn.execute(query)
+                row = cursor.fetchone() if cursor else None
+                if row:
+                    cols = [d[0] for d in conn.description] if conn.description else []
+                    return dict(zip(cols, row))
+                return {}
         finally:
-            conn.close()
+            if self._conn is None:
+                conn.close()
 
     def remove_archives(
         self, file_path: str, version: Optional[int] = None, all_versions: bool = False
@@ -364,98 +328,55 @@ class MetadataStore:
         Returns:
             Dict: Information about the removed entries
         """
-        # We use file basename for LIKE queries below, so no need to normalize here
-        conn = duckdb.connect(str(self.db_path))
-
+        conn = self._connect()
         try:
-            # First, get storage paths and archive IDs to delete files later
-            select_query: str
-            select_params: Union[Tuple[str, ...], Tuple[str, int]]
-
             if all_versions:
-                select_query = """
-                SELECT id, storage_path
-                FROM archives
-                WHERE original_path LIKE ?
-                """
-                select_params = (f"%{Path(file_path).name}%",)
+                sel = "SELECT id, storage_path FROM archives WHERE original_path LIKE ?"
+                params = (f"%{Path(file_path).name}%",)
             elif version is not None:
-                select_query = """
-                SELECT id, storage_path
-                FROM archives
-                WHERE original_path LIKE ? AND version = ?
-                """
-                select_params = (f"%{Path(file_path).name}%", version)
+                sel = "SELECT id, storage_path FROM archives WHERE original_path LIKE ? AND version = ?"
+                params = (f"%{Path(file_path).name}%", version)
             else:
-                select_query = """
-                SELECT id, storage_path
-                FROM archives
+                sel = """
+                SELECT id, storage_path FROM archives
                 WHERE original_path LIKE ?
                 ORDER BY version DESC
                 LIMIT 1
                 """
-                select_params = (f"%{Path(file_path).name}%",)
-
-            result = conn.execute(select_query, select_params).fetchall()
-            archive_ids = [row[0] for row in result] if result else []
-            storage_paths = [row[1] for row in result] if result else []
-
-            # First delete from the stats table to avoid foreign key constraint violations
-            for archive_id in archive_ids:
-                stats_delete_query = "DELETE FROM stats WHERE archive_id = ?"
-                conn.execute(stats_delete_query, (archive_id,))
-
-            conn.commit()  # Commit the stats deletion
-
-            # Now delete from the archives table
+                params = (f"%{Path(file_path).name}%",)
+            rows = conn.execute(sel, params).fetchall()
+            ids = [r[0] for r in rows] if rows else []
+            paths = [r[1] for r in rows] if rows else []
+            # Delete stats
+            for aid in ids:
+                conn.execute("DELETE FROM stats WHERE archive_id = ?", (aid,))
+            conn.commit()
+            # Delete archives
             if all_versions:
-                delete_query = """
-                DELETE FROM archives
-                WHERE original_path LIKE ?
-                """
-                delete_params = (f"%{Path(file_path).name}%",)
+                delq = "DELETE FROM archives WHERE original_path LIKE ?"
+                delp = (f"%{Path(file_path).name}%",)
             elif version is not None:
-                delete_query = """
-                DELETE FROM archives
-                WHERE original_path LIKE ? AND version = ?
-                """
-                delete_params = (f"%{Path(file_path).name}%", version)
+                delq = "DELETE FROM archives WHERE original_path LIKE ? AND version = ?"
+                delp = (f"%{Path(file_path).name}%", version)
             else:
-                delete_query = """
+                delq = """
                 DELETE FROM archives
                 WHERE id IN (
-                    SELECT id FROM archives
-                    WHERE original_path LIKE ?
-                    ORDER BY version DESC
-                    LIMIT 1
-                )
-                """
-                delete_params = (f"%{Path(file_path).name}%",)
-
-            # Execute the deletion query
-            conn.execute(delete_query, delete_params)
-            conn.commit()  # Make sure to commit the deletion
-
-            # For DuckDB we don't have a direct changes() function like in SQLite
-            # Just count the number of paths we collected
-            count = len(storage_paths)
-
-            # Return the result with storage paths for physical file deletion
-            return {"storage_paths": storage_paths, "count": count}
-
+                    SELECT id FROM archives WHERE original_path LIKE ? ORDER BY version DESC LIMIT 1
+                )"""
+                delp = (f"%{Path(file_path).name}%",)
+            conn.execute(delq, delp)
             conn.commit()
-
-            return {"count": count, "storage_paths": storage_paths}
+            return {"storage_paths": paths, "count": len(paths)}
         finally:
-            conn.close()
+            if self._conn is None:
+                conn.close()
 
     def find_archives_by_name(self, name_part: str) -> List[Dict]:
         """Find archives by part of the original file name or archive filename."""
-        conn = duckdb.connect(str(self.db_path))
-
+        conn = self._connect()
         try:
-            # First try to find by exact basename match
-            basename = Path(name_part).name  # Extract basename if path is provided
+            basename = Path(name_part).name
             query = """
             SELECT original_path, MAX(version) as latest_version
             FROM archives
@@ -463,12 +384,8 @@ class MetadataStore:
             GROUP BY original_path
             ORDER BY original_path
             """
-
-            get_params = (basename,)
-            cursor = conn.execute(query, get_params)
+            cursor = conn.execute(query, (basename,))
             results = cursor.fetchall() if cursor else []
-
-            # If no exact matches, try to find by partial path match
             if not results:
                 query = """
                 SELECT original_path, MAX(version) as latest_version
@@ -477,12 +394,8 @@ class MetadataStore:
                 GROUP BY original_path
                 ORDER BY original_path
                 """
-
-                get_params = (name_part,)
-                cursor = conn.execute(query, get_params)
+                cursor = conn.execute(query, (name_part,))
                 results = cursor.fetchall() if cursor else []
-
-            # If still no results, try to find by archive filename
             if not results:
                 query = """
                 SELECT original_path, version as latest_version, storage_path
@@ -490,13 +403,12 @@ class MetadataStore:
                 WHERE CONTAINS(SPLIT_PART(storage_path, '/', -1), ?)
                 ORDER BY original_path
                 """
-                cursor = conn.execute(query, get_params)
+                cursor = conn.execute(query, (name_part,))
                 results = cursor.fetchall() if cursor else []
-
             if not results:
                 return []
-
-            columns = [desc[0] for desc in cursor.description] if cursor.description else []
-            return [{columns[i]: row[i] for i in range(len(columns))} for row in results]
+            cols = [d[0] for d in cursor.description]
+            return [{cols[i]: row[i] for i in range(len(cols))} for row in results]
         finally:
-            conn.close()
+            if self._conn is None:
+                conn.close()

@@ -30,9 +30,10 @@ def extract_schema(file_path: Union[str, Path]) -> Dict[str, Any]:
 
         # Read first few rows to infer schema
         if file_ext == ".csv":
-            # For CSV, we'll count total rows first
+            # For CSV, count total lines and subtract 1 for the header
             with open(file_path) as f:
-                row_count = sum(1 for _ in f)
+                total_lines = sum(1 for _ in f)
+            row_count = total_lines - 1 if total_lines > 0 else 0  # Subtract header
 
             # Then sample to determine column types
             df = pd.read_csv(file_path, nrows=100)

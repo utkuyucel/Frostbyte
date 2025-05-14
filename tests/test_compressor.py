@@ -68,8 +68,10 @@ def test_unsupported_file_format() -> None:
             compressor.compress(temp_file_path)
 
         # Verify the error message
-        assert "Unsupported file format: .txt" in str(excinfo.value)
-        assert "Supported input formats are CSV, Excel, and Parquet" in str(excinfo.value)
+        assert (
+            str(excinfo.value)
+            == "Unsupported format: .txt. Supported formats: CSV, Excel, and Parquet."
+        )
 
     finally:
         # Clean up temp file
