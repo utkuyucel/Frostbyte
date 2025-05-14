@@ -60,15 +60,16 @@ class ArchiveManager:
         version = self.store.get_next_version(file_path_str)
         
         # Create archive name
-        archive_name = f"{file_path_obj.stem}_v{version}{file_path_obj.suffix}.fbyt"
+        archive_name = f"{file_path_obj.stem}_v{version}.parquet"
         archive_path = self.archives_dir / archive_name
         
         # Compress the file
-        compressed_size = self.compressor.compress(file_path, archive_path)
+        _, compressed_size = self.compressor.compress(file_path, archive_path)
         compression_ratio = 100 * (1 - (compressed_size / original_size)) if original_size > 0 else 0
         
         # Record metadata
         archive_id = str(uuid.uuid4())
+        original_extension = file_path_obj.suffix
         self.store.add_archive(
             id=archive_id,
             original_path=file_path_str,
@@ -78,7 +79,8 @@ class ArchiveManager:
             row_count=row_count,
             schema=schema,
             compression_ratio=compression_ratio,
-            storage_path=str(archive_path)
+            storage_path=str(archive_path),
+            original_extension=original_extension
         )
         
         return {
@@ -93,11 +95,11 @@ class ArchiveManager:
     
     def restore(self, path_spec: str) -> Dict:
         """Restore an archived file using path, version, archive filename, or partial name."""
-        # Check for archive filename pattern (_v#.extension.fbyt)
-        if "_v" in path_spec and path_spec.endswith(".fbyt"):
+        # Check for archive filename pattern (_v#.parquet)
+        if "_v" in path_spec and path_spec.endswith(".parquet"):
             # Extract version from the archive filename if present
             try:
-                # Parse potential archive filename (e.g., 'customer_data_v1.csv.fbyt')
+                # Parse potential archive filename (e.g., 'customer_data_v1.parquet')
                 matches = self.find_by_name(path_spec)
                 if matches:
                     if len(matches) == 1:
@@ -150,8 +152,19 @@ class ArchiveManager:
         # Decompress file
         storage_path = Path(archive_info['storage_path'])
         original_path = Path(archive_info['original_path'])
-        
-        self.compressor.decompress(storage_path, original_path)
+        original_extension = archive_info.get('original_extension')
+
+        if not original_extension:
+            # Fallback or raise error if original_extension is missing
+            # For now, let's assume it might be an older archive and try to infer or default
+            # A more robust solution would be to ensure all archives have this
+            # or handle the case explicitly (e.g. by asking user or defaulting to .csv)
+            print(f"Warning: Original extension not found for {storage_path}. Attempting to restore as Parquet's original format if possible, or to a default.")
+            # Defaulting to .csv if not found, or could raise error
+            original_extension = original_path.suffix or '.csv'
+
+
+        self.compressor.decompress(storage_path, original_path, original_extension)
         
         # Calculate or extract file sizes
         schema = archive_info.get('schema', {})

@@ -49,6 +49,7 @@ class MetadataStore:
                 schema JSON,
                 compression_ratio REAL,
                 storage_path VARCHAR NOT NULL,
+                original_extension VARCHAR,
                 UNIQUE(original_path, version)
             )
             """)
@@ -73,7 +74,8 @@ class MetadataStore:
     
     def add_archive(self, id: str, original_path: str, version: int,
                   timestamp: datetime, hash: str, row_count: int,
-                  schema: Dict, compression_ratio: float, storage_path: str) -> None:
+                  schema: Dict, compression_ratio: float, storage_path: str,
+                  original_extension: Optional[str] = None) -> None:
         """Add a new archive entry to the database with associated metadata."""
         conn = duckdb.connect(str(self.db_path))
         
@@ -81,11 +83,11 @@ class MetadataStore:
             conn.execute("""
             INSERT INTO archives (
                 id, original_path, version, timestamp, hash,
-                row_count, schema, compression_ratio, storage_path
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                row_count, schema, compression_ratio, storage_path, original_extension
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 id, original_path, version, timestamp, hash,
-                row_count, json_dumps(schema), compression_ratio, storage_path
+                row_count, json_dumps(schema), compression_ratio, storage_path, original_extension
             ))
             
             # Add column stats if available
