@@ -40,6 +40,3 @@ coverage.xml
 # Frostbyte specific
 .frostbyte/
 *data.db
-
-# GitHub workflows (if not public yet)
-.github/
