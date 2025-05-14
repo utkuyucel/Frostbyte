@@ -11,6 +11,7 @@ import pytest
 
 from frostbyte.core.manager import ArchiveManager
 
+
 @pytest.fixture
 def temp_workspace() -> Generator[str, None, None]:
     """Create a temporary workspace for testing."""
@@ -20,13 +21,15 @@ def temp_workspace() -> Generator[str, None, None]:
         yield tmp_dir
         os.chdir(old_cwd)
 
-@pytest.fixture
-def sample_csv(temp_workspace: str) -> str:
+
+@pytest.mark.usefixtures("temp_workspace")
+def sample_csv() -> str:
     """Create a simple sample CSV file for testing."""
     data = "id,value\n1,10\n2,20\n3,30\n"
     path = Path("data.csv")
     path.write_text(data)
     return str(path)
+
 
 @pytest.mark.usefixtures("temp_workspace")
 def test_initialize_repository() -> None:
@@ -35,6 +38,7 @@ def test_initialize_repository() -> None:
     assert manager.initialize() is True
     assert os.path.isdir(".frostbyte")
     assert os.path.isdir(".frostbyte/archives")
+
 
 @pytest.mark.usefixtures("temp_workspace")
 def test_archive_and_list(sample_csv: str) -> None:
@@ -55,6 +59,7 @@ def test_archive_and_list(sample_csv: str) -> None:
     all_versions = manager.list_archives(show_all=True)
     versions = sorted([entry["version"] for entry in all_versions])
     assert versions == [1, 2]
+
 
 @pytest.mark.usefixtures("temp_workspace")
 def test_purge_versions(sample_csv: str) -> None:

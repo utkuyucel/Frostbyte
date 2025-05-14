@@ -12,10 +12,12 @@ from click.testing import CliRunner
 
 from frostbyte.cli.commands import cli
 
+
 @pytest.fixture
 def cli_runner() -> CliRunner:
     """Provides a CliRunner instance for testing CLI commands."""
     return CliRunner()
+
 
 def test_cli_init(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Test initializing a Frostbyte repository."""
@@ -26,6 +28,7 @@ def test_cli_init(cli_runner: CliRunner, tmp_path: Path) -> None:
         assert os.path.exists(".frostbyte")
         assert os.path.exists(".frostbyte/archives")
         assert os.path.exists(".frostbyte/manifest.db")
+
 
 def test_cli_ls(cli_runner: CliRunner, sample_csv: str) -> None:
     """Test listing archived files."""
@@ -41,6 +44,7 @@ def test_cli_ls(cli_runner: CliRunner, sample_csv: str) -> None:
         result_all = cli_runner.invoke(cli, ["ls", "--all"])
         assert result_all.exit_code == 0
 
+
 def test_cli_stats(cli_runner: CliRunner, sample_csv: str) -> None:
     """Test getting statistics about archives."""
     with cli_runner.isolated_filesystem():
@@ -52,6 +56,7 @@ def test_cli_stats(cli_runner: CliRunner, sample_csv: str) -> None:
         result = cli_runner.invoke(cli, ["stats"])
         assert result.exit_code == 0
         assert "Archive Statistics" in result.output
+
 
 def test_cli_purge(cli_runner: CliRunner, sample_csv: str) -> None:
     """Test purging archive versions."""

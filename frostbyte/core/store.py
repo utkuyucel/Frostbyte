@@ -6,11 +6,12 @@ Manages metadata storage for archived files.
 
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Union
 
 import duckdb
 
 from frostbyte.utils.json_utils import json_dumps
+
 
 class MetadataStore:
     """Handles database interactions for Frostbyte metadata."""
@@ -24,7 +25,7 @@ class MetadataStore:
         else:
             self._conn = None
 
-    def _connect(self):
+    def _connect(self) -> duckdb.DuckDBPyConnection:
         """Return a connection: persistent for memory, new for file."""
         if self._conn:
             return self._conn
@@ -291,8 +292,7 @@ class MetadataStore:
                     cols = [d[0] for d in conn.description] if conn.description else []
                     return dict(zip(cols, row))
                 return {}
-            else:
-                query = """
+            query = """
                 SELECT 
                     COUNT(*) AS total_archives,
                     SUM(
@@ -304,12 +304,12 @@ class MetadataStore:
                     AVG(a.compression_ratio) AS avg_compression_ratio
                 FROM archives a
                 """
-                cursor = conn.execute(query)
-                row = cursor.fetchone() if cursor else None
-                if row:
-                    cols = [d[0] for d in conn.description] if conn.description else []
-                    return dict(zip(cols, row))
-                return {}
+            cursor = conn.execute(query)
+            row = cursor.fetchone() if cursor else None
+            if row:
+                cols = [d[0] for d in conn.description] if conn.description else []
+                return dict(zip(cols, row))
+            return {}
         finally:
             if self._conn is None:
                 conn.close()
@@ -334,7 +334,10 @@ class MetadataStore:
                 sel = "SELECT id, storage_path FROM archives WHERE original_path LIKE ?"
                 params = (f"%{Path(file_path).name}%",)
             elif version is not None:
-                sel = "SELECT id, storage_path FROM archives WHERE original_path LIKE ? AND version = ?"
+                sel = (
+                    "SELECT id, storage_path FROM archives "
+                    "WHERE original_path LIKE ? AND version = ?"
+                )
                 params = (f"%{Path(file_path).name}%", version)
             else:
                 sel = """
