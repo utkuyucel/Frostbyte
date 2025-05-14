@@ -40,3 +40,4 @@ coverage.xml
 # Frostbyte specific
 .frostbyte/
 *data.db
+.ruff_cache/
