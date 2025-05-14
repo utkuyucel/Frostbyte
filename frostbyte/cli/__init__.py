@@ -7,4 +7,4 @@ for the Frostbyte tool.
 
 from frostbyte.cli.commands import cli
 
-__all__ = ['cli']
+__all__ = ["cli"]

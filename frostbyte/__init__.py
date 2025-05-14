@@ -1,7 +1,7 @@
 """
 Frostbyte: Cold Data Archiving for Pandas Workflows
 
-A lightweight, local-first cold data archiving tool for data engineers, scientists, and ML practitioners.
+A lightweight, local-first tool for efficient compression, versioning, and management of data.
 """
 
 __version__ = "0.1.0"
@@ -10,19 +10,27 @@ from typing import Dict, List, Optional
 
 from frostbyte.core.manager import ArchiveManager
 
-# Initialize the global archive manager
-_manager: Optional[ArchiveManager] = None
+
+# Use a class to manage singleton instance instead of global variables
+class _ManagerProvider:
+    """Singleton provider for archive manager instance."""
+
+    _instance: Optional[ArchiveManager] = None
+
+    @classmethod
+    def get(cls) -> ArchiveManager:
+        """Get or create the archive manager instance."""
+        if cls._instance is None:
+            cls._instance = ArchiveManager()
+        return cls._instance
 
 
 def get_manager() -> ArchiveManager:
-    """Get the global archive manager instance."""
-    global _manager
-    if _manager is None:
-        _manager = ArchiveManager()
-    return _manager
+    """Get the archive manager instance."""
+    return _ManagerProvider.get()
 
 
-def init(path: Optional[str] = None) -> bool:
+def init() -> bool:
     """Initialize a new Frostbyte repository."""
     return get_manager().initialize()
 
@@ -34,7 +42,7 @@ def archive(file_path: str) -> Dict:
 
 def restore(path_spec: str, version: Optional[int] = None) -> Dict:
     """Restore an archived file using path, version, archive filename, or partial name.
-    
+
     Args:
         path_spec: Path or name of the file to restore
         version: Specific version to restore (if None, latest version is used)
@@ -54,10 +62,10 @@ def stats(file_path: Optional[str] = None) -> Dict:
 
 def purge(file_path: str, version: Optional[int] = None, all_versions: bool = False) -> Dict:
     """Remove specific archive versions or all versions of a file.
-    
+
     Args:
         file_path: Path of the file to purge
-        version: Specific version to purge (if None and all_versions is False, latest version is purged)
+        version: Specific version to purge (latest is used if None and all_versions is False)
         all_versions: If True, purge all versions of the file
     """
     return get_manager().purge(file_path, version, all_versions)

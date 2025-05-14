@@ -7,5 +7,5 @@ This script is installed as the 'frostbyte' command when the package is installe
 
 from frostbyte.cli import cli
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()

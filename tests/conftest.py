@@ -24,32 +24,32 @@ def temp_workspace() -> Generator[str, None, None]:
 def sample_csv(temp_workspace: str) -> Generator[str, None, None]:
     """Create a sample CSV file for testing."""
     data = {
-        'id': range(100),
-        'value': [i * 2 for i in range(100)],
-        'name': [f'item-{i}' for i in range(100)]
+        "id": range(100),
+        "value": [i * 2 for i in range(100)],
+        "name": [f"item-{i}" for i in range(100)],
     }
     df = pd.DataFrame(data)
 
-    file_path = os.path.join(temp_workspace, 'sample.csv')
+    file_path = os.path.join(temp_workspace, "sample.csv")
     df.to_csv(file_path, index=False)
     yield file_path
 
 
 @pytest.fixture
-def sample_parquet(temp_workspace: str) -> Generator[str, None, None]:
+def sample_parquet(_temp_workspace: str) -> Generator[str, None, None]:
     """Create a sample Parquet file for testing."""
     data = {
-        'id': range(100),
-        'value': [i * 2 for i in range(100)],
-        'name': [f'item-{i}' for i in range(100)]
+        "id": range(100),
+        "value": [i * 2 for i in range(100)],
+        "name": [f"item-{i}" for i in range(100)],
     }
     df = pd.DataFrame(data)
-    
+
     # Create data directory
-    os.makedirs('data', exist_ok=True)
-    
+    os.makedirs("data", exist_ok=True)
+
     # Save the DataFrame to a Parquet file
-    file_path = os.path.join('data', 'sample.parquet')
+    file_path = os.path.join("data", "sample.parquet")
     df.to_parquet(file_path, index=False)
-    
+
     yield file_path

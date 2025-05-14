@@ -18,7 +18,27 @@ Frostbyte is a lightweight, local-first cold data archiving tool for data engine
 git clone https://github.com/utkuyucel/Frostbyte.git
 cd frostbyte
 
-# Create virtual environment
+# Create virtual environment and install
+```
+
+## Development
+
+### Code Quality
+
+Frostbyte uses several linting tools to maintain code quality:
+
+```bash
+# Run all linters (check only), respecting .gitignore patterns
+./lint.sh --check
+
+# Run all linters and fix issues automatically (default)
+./lint.sh
+
+# Run linters on all files, including ignored ones
+./lint.sh --ignore-git
+```
+
+The linting script automatically respects `.gitignore` patterns to avoid processing virtual environments and other excluded files. See [Linting Guide](docs/linting.md) for more details.
 python -m venv frostbyte_venv
 source frostbyte_venv/bin/activate  # On Windows: frostbyte_venv\Scripts\activate
 

@@ -1,7 +1,7 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 # Read long description from README.md
-with open("README.md", "r", encoding="utf-8") as fh:
+with open("README.md", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
@@ -26,13 +26,11 @@ setup(
         "tabulate>=0.9.0",
     ],
     extras_require={
-        'dev': [
+        "dev": [
             "pytest>=7.0.0",
             "pytest-cov>=3.0.0",
             "black>=22.0.0",
-            "isort>=5.10.0",
-            "mypy>=0.950",
-            "flake8>=5.0.0",
+            "ruff>=0.1.0",
         ]
     },
     entry_points={
