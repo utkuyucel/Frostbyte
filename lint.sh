@@ -2,7 +2,7 @@
 
 # lint.sh - Run all linters for the Frostbyte project
 # Usage: 
-#   ./lint.sh [--fix] [--ruff-only|--black-only|--isort-only] [--ignore-git] [directory]
+#   ./lint.sh [--fix] [--ruff-only|--black-only|--isort-only|--pytest-only] [--ignore-git] [directory]
 #   ./lint.sh --help
 
 # Default values
@@ -12,6 +12,7 @@ TARGET_DIR="."
 RUN_RUFF=true
 RUN_BLACK=true
 RUN_ISORT=true
+RUN_PYTEST=true
 RESPECT_GITIGNORE=true  # By default, respect .gitignore patterns
 HELP=false
 
@@ -26,14 +27,22 @@ for arg in "$@"; do
     RUN_RUFF=true
     RUN_BLACK=false
     RUN_ISORT=false
+    RUN_PYTEST=false
   elif [[ "$arg" == "--black-only" ]]; then
     RUN_RUFF=false
     RUN_BLACK=true
     RUN_ISORT=false
+    RUN_PYTEST=false
   elif [[ "$arg" == "--isort-only" ]]; then
     RUN_RUFF=false
     RUN_BLACK=false
     RUN_ISORT=true
+    RUN_PYTEST=false
+  elif [[ "$arg" == "--pytest-only" ]]; then
+    RUN_RUFF=false
+    RUN_BLACK=false
+    RUN_ISORT=false
+    RUN_PYTEST=true
   elif [[ "$arg" == "--ignore-git" ]]; then
     RESPECT_GITIGNORE=false
   elif [[ "$arg" == "--help" ]]; then
@@ -57,6 +66,7 @@ Options:
   --ruff-only    Run only ruff linter and formatter
   --black-only   Run only black formatter
   --isort-only   Run only isort import sorter
+  --pytest-only  Run only pytest
   --ignore-git   Process all files, ignoring .gitignore patterns
   --help         Show this help message
 
@@ -110,8 +120,16 @@ else
 fi
 
 # Run all linters with appropriate flags
+STEP_COUNT=0
+TOTAL_STEPS=0
+[[ "$RUN_RUFF" == "true" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 2)) # Ruff linter and formatter
+[[ "$RUN_BLACK" == "true" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 1))
+[[ "$RUN_ISORT" == "true" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 1))
+[[ "$RUN_PYTEST" == "true" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 1))
+
 if [[ "$RUN_RUFF" == "true" ]]; then
-  echo -e "\n📋 Step 1/4: Running ruff linter..."
+  STEP_COUNT=$((STEP_COUNT + 1))
+  echo -e "\n📋 Step $STEP_COUNT/$TOTAL_STEPS: Running ruff linter..."
   if [[ "$RESPECT_GITIGNORE" == "true" && ! -z "$TARGET_FILES" ]]; then
     echo "$TARGET_FILES" | xargs ruff check $RUFF_FIX_FLAG
     RUFF_EXIT=$?
@@ -120,7 +138,8 @@ if [[ "$RUN_RUFF" == "true" ]]; then
     RUFF_EXIT=$?
   fi
 
-  echo -e "\n📋 Step 2/4: Running ruff formatter..."
+  STEP_COUNT=$((STEP_COUNT + 1))
+  echo -e "\n📋 Step $STEP_COUNT/$TOTAL_STEPS: Running ruff formatter..."
   if [[ "$RESPECT_GITIGNORE" == "true" && ! -z "$TARGET_FILES" ]]; then
     echo "$TARGET_FILES" | xargs ruff format $([[ "$FIX" == "false" ]] && echo "--check")
     RUFF_FORMAT_EXIT=$?
@@ -134,7 +153,8 @@ else
 fi
 
 if [[ "$RUN_BLACK" == "true" ]]; then
-  echo -e "\n📋 Step 3/4: Running black formatter..."
+  STEP_COUNT=$((STEP_COUNT + 1))
+  echo -e "\n📋 Step $STEP_COUNT/$TOTAL_STEPS: Running black formatter..."
   if [[ "$RESPECT_GITIGNORE" == "true" && ! -z "$TARGET_FILES" ]]; then
     echo "$TARGET_FILES" | xargs black $BLACK_FIX_FLAG
     BLACK_EXIT=$?
@@ -147,7 +167,8 @@ else
 fi
 
 if [[ "$RUN_ISORT" == "true" ]]; then
-  echo -e "\n📋 Step 4/4: Running isort import sorter..."
+  STEP_COUNT=$((STEP_COUNT + 1))
+  echo -e "\n📋 Step $STEP_COUNT/$TOTAL_STEPS: Running isort import sorter..."
   if [[ "$RESPECT_GITIGNORE" == "true" && ! -z "$TARGET_FILES" ]]; then
     echo "$TARGET_FILES" | xargs isort $ISORT_FIX_FLAG
     ISORT_EXIT=$?
@@ -159,16 +180,26 @@ else
   ISORT_EXIT=0
 fi
 
-# Check if any linter failed
-if [[ $RUFF_EXIT -ne 0 || $RUFF_FORMAT_EXIT -ne 0 || $BLACK_EXIT -ne 0 || $ISORT_EXIT -ne 0 ]]; then
-  echo -e "\n❌ Linting failed!"
+if [[ "$RUN_PYTEST" == "true" ]]; then
+  STEP_COUNT=$((STEP_COUNT + 1))
+  echo -e "\n📋 Step $STEP_COUNT/$TOTAL_STEPS: Running pytest..."
+  pytest
+  PYTEST_EXIT=$?
+else
+  PYTEST_EXIT=0
+fi
+
+# Check if any linter or test failed
+if [[ $RUFF_EXIT -ne 0 || $RUFF_FORMAT_EXIT -ne 0 || $BLACK_EXIT -ne 0 || $ISORT_EXIT -ne 0 || $PYTEST_EXIT -ne 0 ]]; then
+  echo -e "\n❌ Checks failed!"
   [[ $RUFF_EXIT -ne 0 ]] && echo "   - ruff check found issues"
   [[ $RUFF_FORMAT_EXIT -ne 0 ]] && echo "   - ruff format found issues"
   [[ $BLACK_EXIT -ne 0 ]] && echo "   - black found issues"
   [[ $ISORT_EXIT -ne 0 ]] && echo "   - isort found issues"
+  [[ $PYTEST_EXIT -ne 0 ]] && echo "   - pytest found issues"
   
   if [[ "$FIX" == "false" ]]; then
-    echo -e "\n💡 Run './lint.sh' without the --check flag to attempt to fix issues automatically."
+    echo -e "\n💡 Run './lint.sh' without the --check flag to attempt to fix issues automatically (pytest issues will still need manual fixing)."
   fi
   exit 1
 else
