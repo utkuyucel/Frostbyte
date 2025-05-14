@@ -86,19 +86,21 @@ def archive_cmd(path: str) -> None:
 
 @cli.command('restore')
 @click.argument('path_spec', required=True)
-def restore_cmd(path_spec: str) -> None:
+@click.option('--version', '-v', type=int, help='Specific version to restore')
+def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
     """Decompress and restore original file.
     
     PATH_SPEC can be:
-    - A file path with an optional version (e.g., data/file.csv@2)
-    - An archive filename (e.g., customer_data_v1.csv.fbyt)
+    - A file path (e.g., data/file.csv)
+    - An archive filename (e.g., customer_data_v1.parquet)
     - A partial filename to search for (e.g., customer_data)
     
+    You can specify a version using the --version/-v option.
     If no version is specified, the latest version is restored.
     When using a partial name, if multiple files match, you'll be asked to be more specific.
     """
     try:
-        result = frostbyte.restore(path_spec)
+        result = frostbyte.restore(path_spec, version)
         
         # Format file sizes for display
         def format_size(size_bytes: float) -> str:
@@ -243,12 +245,13 @@ def stats_cmd(file_path: Optional[str] = None) -> None:
 
 @cli.command('purge')
 @click.argument('file_path', required=True)
+@click.option('--version', '-v', type=int, help='Specific version to purge')
 @click.option('--all', '-a', 'all_versions', is_flag=True, 
               help="Remove all versions of the file")
-def purge_cmd(file_path: str, all_versions: bool) -> None:
+def purge_cmd(file_path: str, version: Optional[int] = None, all_versions: bool = False) -> None:
     """Remove archive versions or entire file from storage."""
     try:
-        result = frostbyte.purge(file_path, all_versions)
+        result = frostbyte.purge(file_path, version, all_versions)
         
         if all_versions:
             message = f"Removed all versions of {result['original_path']}"

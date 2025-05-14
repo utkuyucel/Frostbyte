@@ -77,7 +77,7 @@ frostbyte restore cleaned
 
 4. **Restore a specific version**:
    ```bash
-   frostbyte restore data/experiment.csv@1
+   frostbyte restore data/experiment.csv -v 1
    ```
 
 5. **View statistics**:
@@ -104,7 +104,7 @@ See our detailed [Data Versioning with Frostbyte](docs/versioning-workflow.md) g
 |-----------------------------|------------------------------------------------------|
 | `frostbyte init`            | Initialize project, create `.frostbyte/` directory (**CAUTION**: recreates DB if exists, requires confirmation) |
 | `frostbyte archive <path>`  | Compress file, record metadata                       |
-| `frostbyte restore <path-spec>` | Decompress and restore file using various formats: original path with optional version (e.g., `data.csv@2`), archive filename (e.g., `data_v2.csv.fbyt`), or partial name (e.g., `data`) |
+| `frostbyte restore <path-spec> [-v VERSION]` | Decompress and restore file using various formats: path with optional version parameter (e.g., `data.csv -v 2`), archive filename (e.g., `data_v2.parquet`), or partial name (e.g., `data`) |
 | `frostbyte ls`              | List summary of archived files with latest versions  |
 | `frostbyte ls --all`        | List all versions with detailed info (date, size, filename) |
 | `frostbyte stats [<file>]`  | Show size savings, last access, total versions       |

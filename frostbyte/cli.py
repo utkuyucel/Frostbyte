@@ -39,72 +39,108 @@ def archive(path: str):
 
 @cli.command()
 @click.argument('path', type=str)
-def restore(path: str):
+@click.option('--version', '-v', type=int, help='Specific version to restore')
+def restore(path: str, version: Optional[int] = None):
     """Restore an archived file to its original location."""
     manager = ArchiveManager()
-    result = manager.restore(path)
+    result = manager.restore(path, version)
     click.echo(f"Restored {result['original_path']} (version {result['version']})")
 
 
 @cli.command()
 @click.option('--all', is_flag=True, help='Show all versions with detailed information (creation date, file sizes, archive filenames)')
 def ls(all: bool):
-    """List archived files and versions.
-    
-    Without --all: Shows summary with latest version and total stats.
-    With --all: Shows detailed information for each version.
-    """
+    """List archived files, optionally showing all versions."""
     manager = ArchiveManager()
-    archives = manager.list_archives(show_all=all)
+    results = manager.list_archives(all)
     
-    if not archives:
+    if not results:
         click.echo("No archives found.")
         return
+    
+    if all:
+        # Format table headers and rows
+        headers = ["Path", "Version", "Created", "Size (MB)", "Compressed (MB)", "Savings"]
+        table_data = []
         
-    for archive in archives:
-        if all:
-            # Convert sizes to KB or MB for better readability
-            original_size = archive['original_size_bytes'] / 1024
-            compressed_size = archive['compressed_size_bytes'] / 1024
-            size_unit = "KB"
+        for result in results:
+            # Convert bytes to MB
+            original_size_mb = result.get('original_size_bytes', 0) / (1024 * 1024)
+            compressed_size_mb = result.get('compressed_size_bytes', 0) / (1024 * 1024)
             
-            if original_size > 1024:
-                original_size /= 1024
-                compressed_size /= 1024
-                size_unit = "MB"
+            table_data.append([
+                result['original_path'],
+                result['version'],
+                result['timestamp'],
+                f"{original_size_mb:.2f}",
+                f"{compressed_size_mb:.2f}",
+                f"{result.get('compression_ratio', 0):.0f}%"
+            ])
+        
+        # Print formatted table
+        col_widths = [max(len(str(row[i])) for row in table_data + [headers]) for i in range(len(headers))]
+        
+        # Print headers
+        header_fmt = "  ".join(f"{{:<{w}}}" for w in col_widths)
+        click.echo(header_fmt.format(*headers))
+        
+        # Print separator
+        click.echo("  ".join("-" * w for w in col_widths))
+        
+        # Print rows
+        row_fmt = "  ".join(f"{{:<{w}}}" for w in col_widths)
+        for row in table_data:
+            click.echo(row_fmt.format(*[str(cell) for cell in row]))
+    else:
+        # Show only latest versions
+        headers = ["Path", "Latest", "# Vers", "Last Modified", "Total Size (MB)"]
+        table_data = []
+        
+        for result in results:
+            # Convert bytes to MB
+            total_size_mb = result.get('total_size_bytes', 0) / (1024 * 1024)
             
-            click.echo(f"{archive['original_path']}@{archive['version']} - {archive['archive_filename']}")
-            click.echo(f"  Created: {archive['timestamp']} - Size: {original_size:.2f} {size_unit} → {compressed_size:.2f} {size_unit} ({archive['compression_ratio']:.1f}% saved)")
-            click.echo(f"  Rows: {archive['row_count']}")
-        else:
-            last_version = archive['latest_version']
-            total_versions = archive['version_count']
-            
-            # Convert sizes to KB or MB for better readability
-            total_size = archive['total_size_bytes'] / 1024
-            total_compressed = archive['total_compressed_bytes'] / 1024
-            size_unit = "KB"
-            
-            if total_size > 1024:
-                total_size /= 1024
-                total_compressed /= 1024
-                size_unit = "MB"
-                
-            click.echo(f"{archive['original_path']} - Version {last_version} of {total_versions}")
-            click.echo(f"  Last modified: {archive['last_modified']}")
-            click.echo(f"  Total size: {total_size:.2f} {size_unit} → {total_compressed:.2f} {size_unit} ({archive['avg_compression']:.1f}% saved)")
+            table_data.append([
+                result['original_path'],
+                result['latest_version'],
+                result['version_count'],
+                result['last_modified'],
+                f"{total_size_mb:.2f}"
+            ])
+        
+        # Print formatted table
+        col_widths = [max(len(str(row[i])) for row in table_data + [headers]) for i in range(len(headers))]
+        
+        # Print headers
+        header_fmt = "  ".join(f"{{:<{w}}}" for w in col_widths)
+        click.echo(header_fmt.format(*headers))
+        
+        # Print separator
+        click.echo("  ".join("-" * w for w in col_widths))
+        
+        # Print rows
+        row_fmt = "  ".join(f"{{:<{w}}}" for w in col_widths)
+        for row in table_data:
+            click.echo(row_fmt.format(*[str(cell) for cell in row]))
 
 
 @cli.command()
-@click.argument('file', type=str, required=False)
-def stats(file: Optional[str] = None):
-    """Show size savings, last access, total versions."""
+@click.argument('file_path', required=False)
+def stats(file_path: Optional[str] = None):
+    """Show statistics about archived files."""
     manager = ArchiveManager()
-    stats_data = manager.get_stats(file_path=file)
+    stats_data = manager.get_stats(file_path)
     
-    if not file:
+    if not stats_data:
+        click.echo("No archives found.")
+        return
+    
+    if 'total_archives' in stats_data:
+        # Global stats
         click.echo(f"Total archives: {stats_data['total_archives']}")
-        click.echo(f"Total size saved: {stats_data['total_size_saved']:.2f} MB")
+        click.echo(f"Total size: {stats_data['total_size_bytes'] / (1024 * 1024):.2f} MB")
+        click.echo(f"Total compressed: {stats_data['total_compressed_bytes'] / (1024 * 1024):.2f} MB")
+        click.echo(f"Size saved: {stats_data['total_size_saved'] / (1024 * 1024):.2f} MB")
         click.echo(f"Average compression ratio: {stats_data['avg_compression_ratio']:.0f}%")
     else:
         click.echo(f"File: {stats_data['original_path']}")
@@ -116,17 +152,14 @@ def stats(file: Optional[str] = None):
 
 @cli.command()
 @click.argument('file', type=str)
+@click.option('--version', '-v', type=int, help='Specific version to purge')
 @click.option('--all', is_flag=True, help='Remove all versions')
-def purge(file: str, all: bool):
+def purge(file: str, version: Optional[int] = None, all: bool = False):
     """Remove archive versions or entire file from storage."""
     manager = ArchiveManager()
-    result = manager.purge(file, all_versions=all)
+    result = manager.purge(file, version, all_versions=all)
     
     if all:
         click.echo(f"Removed all versions of {result['original_path']}")
     else:
         click.echo(f"Removed version {result['version']} of {result['original_path']}")
-
-
-if __name__ == '__main__':
-    cli()

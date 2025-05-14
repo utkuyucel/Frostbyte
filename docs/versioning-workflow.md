@@ -81,7 +81,7 @@ $ frostbyte ls --all
 │ customer_data.csv│ 3       │ 2025-05-13 10:22:33 │ 48.7 MB │ 14.5 MB    │ 70.2% │
 ```
 
-> **Tip:** Use the "Original Path" and "Version" from this table to construct your restore commands. For example, to restore version 2 of customer_data.csv, you would use: `frostbyte restore customer_data.csv@2`
+> **Tip:** Use the "Original Path" and "Version" from this table to construct your restore commands. For example, to restore version 2 of customer_data.csv, you would use: `frostbyte restore customer_data.csv -v 2`
 
 Get detailed statistics about your archived files:
 
@@ -103,7 +103,9 @@ If you discover an issue with your current version, you can restore a previous o
 The `restore` command has the following syntax:
 
 ```bash
-frostbyte restore <path_spec>
+frostbyte restore <path_spec> [--version VERSION]
+# or
+frostbyte restore <path_spec> [-v VERSION]
 ```
 
 Where `<path_spec>` can be in one of these formats:
@@ -111,11 +113,11 @@ Where `<path_spec>` can be in one of these formats:
 - **Path only** (restores the latest version):  
   `frostbyte restore customer_data.csv`
 
-- **Path with version** (restores a specific version):  
-  `frostbyte restore customer_data.csv@2`
+- **Path with version parameter** (restores a specific version):  
+  `frostbyte restore customer_data.csv -v 2`
 
 - **Archive filename** (restores the specific archive):  
-  `frostbyte restore customer_data_v2.csv.fbyt`
+  `frostbyte restore customer_data_v2.parquet`
 
 - **Partial filename** (searches for matching files):  
   `frostbyte restore customer_data`
@@ -129,20 +131,20 @@ Where `<path_spec>` can be in one of these formats:
 $ frostbyte restore customer_data.csv
 ✅ Restored customer_data.csv (latest) to customer_data.csv
 
-# Restore version 2 specifically using path@version
-$ frostbyte restore customer_data.csv@2
+# Restore version 2 specifically using version parameter
+$ frostbyte restore customer_data.csv -v 2
 ✅ Restored customer_data.csv (v2) to customer_data.csv
 
 # Restore using the archive filename
-$ frostbyte restore customer_data_v1.csv.fbyt
+$ frostbyte restore customer_data_v1.parquet
 ✅ Restored customer_data.csv (v1) to customer_data.csv
 
 # Restore using just the partial name (if it uniquely identifies one file)
 $ frostbyte restore customer_data
 ✅ Restored customer_data.csv (latest) to customer_data.csv
 
-# For files in subdirectories, include the relative or absolute path
-$ frostbyte restore data/raw/customer_data.csv@1
+# For files in subdirectories, include the relative or absolute path with version
+$ frostbyte restore data/raw/customer_data.csv --version 1
 ✅ Restored data/raw/customer_data.csv (v1) to data/raw/customer_data.csv
 
 # Verify it's the right version
@@ -208,8 +210,8 @@ $ frostbyte ls --all
 │ customer_data.csv│ 2       │ 2025-05-11 09:15:47 │ 43.2 MB │ 13.1 MB    │ 69.7% │ <- Last known good version
 │ customer_data.csv│ 3       │ 2025-05-13 10:22:33 │ 48.7 MB │ 14.5 MB    │ 70.2% │ <- Problematic version
 
-# Restore the specific version (use the path + @version syntax)
-$ frostbyte restore customer_data.csv@2
+# Restore the specific version using the -v parameter
+$ frostbyte restore customer_data.csv -v 2
 ✅ Restored customer_data.csv (v2) to customer_data.csv
 ```
 
@@ -234,8 +236,8 @@ To understand differences between versions:
 
 ```bash
 # Restore both versions to temporary files
-$ frostbyte restore customer_data.csv@2 --output v2.csv
-$ frostbyte restore customer_data.csv@3 --output v3.csv
+$ frostbyte restore customer_data.csv -v 2 --output v2.csv
+$ frostbyte restore customer_data.csv -v 3 --output v3.csv
 # Use comparison tools
 $ python compare_datasets.py v2.csv v3.csv
 ```

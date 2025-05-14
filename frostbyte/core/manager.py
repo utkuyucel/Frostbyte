@@ -5,7 +5,9 @@ Orchestrates the archiving, restoring, and management of data files.
 """
 
 import os
+import json
 import uuid
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Union
@@ -14,6 +16,16 @@ from frostbyte.core.compressor import Compressor
 from frostbyte.core.store import MetadataStore
 from frostbyte.utils.file_utils import get_file_hash, get_file_size
 from frostbyte.utils.schema import extract_schema
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("frostbyte")
 
 
 class ArchiveManager:
@@ -63,8 +75,21 @@ class ArchiveManager:
         archive_name = f"{file_path_obj.stem}_v{version}.parquet"
         archive_path = self.archives_dir / archive_name
         
-        # Compress the file
-        _, compressed_size = self.compressor.compress(file_path, archive_path)
+        # Check if file is smaller than 10MB threshold (10 * 1024 * 1024 bytes)
+        compress_threshold = 10 * 1024 * 1024  # 10 MB in bytes
+        should_compress = original_size >= compress_threshold
+        
+        if should_compress:
+            # Compress the file
+            logger.info(f"Compressing file: {file_path} ({original_size / (1024*1024):.2f} MB)")
+            _, compressed_size = self.compressor.compress(file_path, archive_path)
+        else:
+            # Skip compression for small files, just copy the file
+            import shutil
+            logger.info(f"Skipping compression for small file: {file_path} ({original_size / 1024:.2f} KB)")
+            shutil.copy2(file_path, archive_path)
+            compressed_size = original_size
+            
         compression_ratio = 100 * (1 - (compressed_size / original_size)) if original_size > 0 else 0
         
         # Record metadata
@@ -93,8 +118,16 @@ class ArchiveManager:
             'compression_ratio': compression_ratio
         }
     
-    def restore(self, path_spec: str) -> Dict:
-        """Restore an archived file using path, version, archive filename, or partial name."""
+    def restore(self, path_spec: str, version: Optional[Union[int, float]] = None) -> Dict:
+        """Restore an archived file using path, version, archive filename, or partial name.
+        
+        Args:
+            path_spec: Path or name of the file to restore
+            version: Specific version to restore (if None, latest version is used)
+        """
+        # Normalize path for consistent matching
+        normalized_path_spec = str(Path(path_spec).resolve()) if os.path.exists(path_spec) else path_spec
+        
         # Check for archive filename pattern (_v#.parquet)
         if "_v" in path_spec and path_spec.endswith(".parquet"):
             # Extract version from the archive filename if present
@@ -103,10 +136,11 @@ class ArchiveManager:
                 matches = self.find_by_name(path_spec)
                 if matches:
                     if len(matches) == 1:
-                        # For archive filenames, we already have the version in the match
+                        # Use provided version or fall back to the one from the match
+                        archive_version = version if version is not None else matches[0]['latest_version']
                         archive_info = self.store.get_archive(
                             matches[0]['original_path'], 
-                            matches[0]['latest_version']
+                            archive_version
                         )
                     else:
                         # Multiple matching archive filenames
@@ -118,36 +152,60 @@ class ArchiveManager:
             except ValueError:
                 # If parsing fails, continue to regular path handling
                 archive_info = None
-        # Parse path with @version
-        elif '@' in path_spec:
-            path, version_str = path_spec.split('@', 1)
-            version = self._parse_version(version_str)
-            
-            # Get archive info by exact path and version
-            archive_info = self.store.get_archive(path, version)
-            if not archive_info:
-                raise ValueError(f"Archive not found: {path_spec}")
         else:
-            # First try as exact path with latest version
-            archive_info = self.store.get_archive(path_spec)
-            
-            # If not found, try as a partial name search
-            if not archive_info:
-                matches = self.find_by_name(path_spec)
-                if not matches:
-                    raise ValueError(f"No archives found matching: {path_spec}")
+            # Try both approaches - get by exact path and by basename
+            if version is not None:
+                # First try exact path with version
+                archive_info = self.store.get_archive(normalized_path_spec, version)
                 
-                if len(matches) > 1:
-                    # If multiple matches, show options to the user
-                    match_paths = [f"{m['original_path']} (v{m['latest_version']})" for m in matches]
-                    matches_str = '\n  '.join(match_paths)
-                    raise ValueError(f"Multiple archives match '{path_spec}':\n  {matches_str}\nPlease be more specific or use the full path.")
+                # If not found, try using the basename with version
+                if not archive_info:
+                    basename = Path(path_spec).name
+                    # Try to search by basename
+                    matches = self.find_by_name(basename)
+                    if matches:
+                        # Filter matches by version if specified
+                        versioned_matches = []
+                        for match in matches:
+                            # Check if this path's latest version matches our requested version
+                            match_info = self.store.get_archive(match['original_path'], version)
+                            if match_info:
+                                versioned_matches.append(match_info)
+                        
+                        if len(versioned_matches) == 1:
+                            archive_info = versioned_matches[0]
+                        elif len(versioned_matches) > 1:
+                            # Multiple matches with same version
+                            match_paths = [f"{m['original_path']} (v{version})" for m in versioned_matches]
+                            matches_str = '\n  '.join(match_paths)
+                            raise ValueError(f"Multiple archives found with version {version}:\n  {matches_str}\nPlease be more specific.")
                 
-                # Get the archive info for the only match
-                archive_info = self.store.get_archive(matches[0]['original_path'], matches[0]['latest_version'])
+                if not archive_info:
+                    raise ValueError(f"Archive not found: {path_spec} version {version}")
+            else:
+                # First try as exact path with latest version
+                archive_info = self.store.get_archive(normalized_path_spec)
+                
+                # If not found, try as a partial name search
+                if not archive_info:
+                    matches = self.find_by_name(path_spec)
+                    if not matches:
+                        raise ValueError(f"No archives found matching: {path_spec}")
+                    
+                    if len(matches) > 1:
+                        # If multiple matches, show options to the user
+                        match_paths = [f"{m['original_path']} (v{m['latest_version']})" for m in matches]
+                        matches_str = '\n  '.join(match_paths)
+                        raise ValueError(f"Multiple archives match '{path_spec}':\n  {matches_str}\nPlease be more specific or use the full path.")
+                    
+                    # Get the archive info for the only match
+                    archive_info = self.store.get_archive(matches[0]['original_path'], matches[0]['latest_version'])
         
         if not archive_info:
-            raise ValueError(f"Could not locate archive: {path_spec}")
+            if version is not None:
+                raise ValueError(f"Could not locate archive: {path_spec} version {version}")
+            else:
+                raise ValueError(f"Could not locate archive: {path_spec}")
             
         # Decompress file
         storage_path = Path(archive_info['storage_path'])
@@ -226,17 +284,19 @@ class ArchiveManager:
         """Get statistics about archived files, for specific file or all archives."""
         return self.store.get_stats(file_path)
     
-    def purge(self, file_path: str, all_versions: bool = False) -> Dict:
-        """Remove specific archive versions or all versions of a file."""
-        # Parse path and version
-        if '@' in file_path and not all_versions:
-            path, version_str = file_path.split('@', 1)
-            version = self._parse_version(version_str)
-        else:
-            path = file_path
-            version = None  # Use latest if not all_versions
+    def purge(self, file_path: str, version: Optional[Union[int, float]] = None, all_versions: bool = False) -> Dict:
+        """Remove specific archive versions or all versions of a file.
+        
+        Args:
+            file_path: Path of the file to purge
+            version: Specific version to purge (if None and all_versions is False, latest version is purged)
+            all_versions: If True, purge all versions of the file
+        """
+        # If all_versions is True, version is ignored
+        if all_versions:
+            version = None
             
-        result = self.store.remove_archives(path, int(version) if version is not None else None, all_versions)
+        result = self.store.remove_archives(file_path, int(version) if version is not None else None, all_versions)
         
         # Remove physical files
         for archive_path in result.get('storage_paths', []):
@@ -246,7 +306,7 @@ class ArchiveManager:
                 pass
         
         return {
-            'original_path': path,
+            'original_path': file_path,
             'version': version,
             'count': result.get('count', 0)
         }

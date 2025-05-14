@@ -6,6 +6,7 @@ Uses Parquet format exclusively for columnar compression of data files.
 """
 
 import hashlib
+import logging
 import shutil
 from pathlib import Path
 from typing import Union, Dict, Any, Tuple, Optional
@@ -13,6 +14,9 @@ from typing import Union, Dict, Any, Tuple, Optional
 import pandas as pd
 import pyarrow as pa  # type: ignore
 import pyarrow.parquet as pq  # type: ignore
+
+# Configure logging if it hasn't been configured yet
+logger = logging.getLogger("frostbyte.compressor")
 
 class Compressor:
     """Handles Parquet-based data storage and retrieval for dataset versioning."""
