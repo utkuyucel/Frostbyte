@@ -9,14 +9,14 @@ This guide demonstrates how to use Frostbyte to manage multiple versions of a da
 Start by initializing a Frostbyte repository in your project:
 
 ```bash
-$ frostbyte init
+$ frostbyte init  # or: fb init
 ✅ Initialized Frostbyte repository in .frostbyte/
 ```
 
 > **⚠️ CAUTION:** If Frostbyte is already initialized in your project, running `init` again will delete all archives and reset the database. You'll be prompted for confirmation before proceeding.
 >
 > ```bash
-> $ frostbyte init
+> $ frostbyte init  # or: fb init
 > ⚠️ WARNING: Frostbyte is already initialized. This will delete all archives and reset the database. Continue? [y/N]: n
 > Initialization aborted
 > ```
@@ -33,7 +33,7 @@ id,name,email,signup_date,purchase_count
 1,John Doe,john@example.com,2023-01-15,5
 2,Jane Smith,jane@example.com,2023-02-20,3
 
-$ frostbyte archive customer_data.csv
+$ frostbyte archive customer_data.csv  # or: fb archive customer_data.csv
 ✅ Archived customer_data.csv (v1)
    Original size: 42.5 MB
    Compressed size: 12.8 MB
@@ -103,24 +103,24 @@ If you discover an issue with your current version, you can restore a previous o
 The `restore` command has the following syntax:
 
 ```bash
-frostbyte restore <path_spec> [--version VERSION]
+frostbyte restore <path_spec> [--version VERSION]  # or: fb restore <path_spec> [--version VERSION]
 # or
-frostbyte restore <path_spec> [-v VERSION]
+frostbyte restore <path_spec> [-v VERSION]  # or: fb restore <path_spec> [-v VERSION]
 ```
 
 Where `<path_spec>` can be in one of these formats:
 
 - **Path only** (restores the latest version):  
-  `frostbyte restore customer_data.csv`
+  `frostbyte restore customer_data.csv` or `fb restore customer_data.csv`
 
 - **Path with version parameter** (restores a specific version):  
-  `frostbyte restore customer_data.csv -v 2`
+  `frostbyte restore customer_data.csv -v 2` or `fb restore customer_data.csv -v 2`
 
 - **Archive filename** (restores the specific archive):  
-  `frostbyte restore customer_data_v2.parquet`
+  `frostbyte restore customer_data_v2.parquet` or `fb restore customer_data_v2.parquet`
 
 - **Partial filename** (searches for matching files):  
-  `frostbyte restore customer_data`
+  `frostbyte restore customer_data` or `fb restore customer_data`
 
 > **Note:** You can use either the original file path or the archive filename. Frostbyte is flexible and will find the correct version based on your input.
 
@@ -128,23 +128,23 @@ Where `<path_spec>` can be in one of these formats:
 
 ```bash
 # Restore the latest version using path
-$ frostbyte restore customer_data.csv
+$ frostbyte restore customer_data.csv  # or: fb restore customer_data.csv
 ✅ Restored customer_data.csv (latest) to customer_data.csv
 
 # Restore version 2 specifically using version parameter
-$ frostbyte restore customer_data.csv -v 2
+$ frostbyte restore customer_data.csv -v 2  # or: fb restore customer_data.csv -v 2
 ✅ Restored customer_data.csv (v2) to customer_data.csv
 
 # Restore using the archive filename
-$ frostbyte restore customer_data_v1.parquet
+$ frostbyte restore customer_data_v1.parquet  # or: fb restore customer_data_v1.parquet
 ✅ Restored customer_data.csv (v1) to customer_data.csv
 
 # Restore using just the partial name (if it uniquely identifies one file)
-$ frostbyte restore customer_data
+$ frostbyte restore customer_data  # or: fb restore customer_data
 ✅ Restored customer_data.csv (latest) to customer_data.csv
 
 # For files in subdirectories, include the relative or absolute path with version
-$ frostbyte restore data/raw/customer_data.csv --version 1
+$ frostbyte restore data/raw/customer_data.csv --version 1  # or: fb restore data/raw/customer_data.csv --version 1
 ✅ Restored data/raw/customer_data.csv (v1) to data/raw/customer_data.csv
 
 # Verify it's the right version
@@ -166,7 +166,7 @@ $ python fix_data.py customer_data.csv
 ✅ Fixed 12 records with incorrect purchase counts
 
 # Archive this new version
-$ frostbyte archive customer_data.csv
+$ frostbyte archive customer_data.csv  # or: fb archive customer_data.csv
 ✅ Archived customer_data.csv (v4)
    Original size: 43.2 MB
    Compressed size: 13.0 MB
@@ -178,7 +178,7 @@ $ frostbyte archive customer_data.csv
 Now your version history will show the branching workflow:
 
 ```bash
-$ frostbyte ls --all
+$ frostbyte ls --all  # or: fb ls --all
 │ Original Path    │ Version │ Date                │ Size    │ Compressed │ Ratio │
 │--------------------------------------------------------------------------------│
 │ customer_data.csv│ 1       │ 2025-05-10 14:32:15 │ 42.5 MB │ 12.8 MB    │ 70.1% │
@@ -192,7 +192,7 @@ $ frostbyte ls --all
 1. **Create meaningful versions**: Archive datasets after significant changes
 2. **Use version annotations**: Document what changed in each version
 3. **Regularly check statistics**: Monitor compression ratios and disk savings
-4. **Clean up old versions**: Use `frostbyte purge` to remove unneeded versions
+4. **Clean up old versions**: Use `frostbyte purge` or `fb purge` to remove unneeded versions
 5. **Version your scripts too**: Keep processing scripts aligned with dataset versions
 
 ## Common Scenarios
@@ -203,7 +203,7 @@ If a data processing pipeline introduces errors:
 
 ```bash
 # Identify the last good version
-$ frostbyte ls --all
+$ frostbyte ls --all  # or: fb ls --all
 │ Original Path    │ Version │ Date                │ Size    │ Compressed │ Ratio │
 │--------------------------------------------------------------------------------│
 │ customer_data.csv│ 1       │ 2025-05-10 14:32:15 │ 42.5 MB │ 12.8 MB    │ 70.1% │
@@ -211,7 +211,7 @@ $ frostbyte ls --all
 │ customer_data.csv│ 3       │ 2025-05-13 10:22:33 │ 48.7 MB │ 14.5 MB    │ 70.2% │ <- Problematic version
 
 # Restore the specific version using the -v parameter
-$ frostbyte restore customer_data.csv -v 2
+$ frostbyte restore customer_data.csv -v 2  # or: fb restore customer_data.csv -v 2
 ✅ Restored customer_data.csv (v2) to customer_data.csv
 ```
 
@@ -222,12 +222,12 @@ To experiment without affecting the main dataset:
 ```bash
 # Restore a specific version to a different output file
 # (Note: Optional --output flag not yet implemented in current version)
-$ frostbyte restore customer_data.csv@2
+$ frostbyte restore customer_data.csv@2  # or: fb restore customer_data.csv@2
 $ cp customer_data.csv experiment.csv
 
 # Make changes and archive as a new file
 $ python transform.py experiment.csv
-$ frostbyte archive experiment.csv
+$ frostbyte archive experiment.csv  # or: fb archive experiment.csv
 ```
 
 ### Comparing Versions
@@ -236,8 +236,8 @@ To understand differences between versions:
 
 ```bash
 # Restore both versions to temporary files
-$ frostbyte restore customer_data.csv -v 2 --output v2.csv
-$ frostbyte restore customer_data.csv -v 3 --output v3.csv
+$ frostbyte restore customer_data.csv -v 2 --output v2.csv  # or: fb restore customer_data.csv -v 2 --output v2.csv
+$ frostbyte restore customer_data.csv -v 3 --output v3.csv  # or: fb restore customer_data.csv -v 3 --output v3.csv
 # Use comparison tools
 $ python compare_datasets.py v2.csv v3.csv
 ```
@@ -258,7 +258,7 @@ In some cases, you may need to completely reset your Frostbyte repository, remov
 To reset your Frostbyte repository:
 
 ```bash
-$ frostbyte init
+$ frostbyte init  # or: fb init
 ⚠️ WARNING: Frostbyte is already initialized. This will delete all archives and reset the database. Continue? [y/N]: y
 ✓ Frostbyte initialized successfully
   Database reset to empty state

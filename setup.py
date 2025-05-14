@@ -36,6 +36,7 @@ setup(
     entry_points={
         "console_scripts": [
             "frostbyte=frostbyte.cli:cli",
+            "fb=frostbyte.cli:cli",
         ],
     },
     classifiers=[

@@ -53,25 +53,25 @@ pip install -e .
 
 ```bash
 # Initialize Frostbyte in your project
-frostbyte init
+frostbyte init  # or use the shorter alias: fb init
 
 # Archive a CSV file
-frostbyte archive data/cleaned.csv
+frostbyte archive data/cleaned.csv  # or: fb archive data/cleaned.csv
 
 # List archived files
-frostbyte ls
+frostbyte ls  # or: fb ls
 
 # Get stats about your archives
-frostbyte stats
+frostbyte stats  # or: fb stats
 
 # Restore an archived file (latest version)
-frostbyte restore data/cleaned.csv
+frostbyte restore data/cleaned.csv  # or: fb restore data/cleaned.csv
 
 # Restore by archive filename 
-frostbyte restore cleaned_v1.csv.fbyt
+frostbyte restore cleaned_v1.csv.fbyt  # or: fb restore cleaned_v1.csv.fbyt
 
 # Restore by partial name match
-frostbyte restore cleaned
+frostbyte restore cleaned  # or: fb restore cleaned
 
 
 ```
@@ -82,22 +82,22 @@ frostbyte restore cleaned
 
 1. **Initialize a new project**:
    ```bash
-   frostbyte init
+   frostbyte init  # or: fb init
    ```
 
 2. **Archive a file after processing**:
    ```bash
-   frostbyte archive data/experiment.csv
+   frostbyte archive data/experiment.csv  # or: fb archive data/experiment.csv
    ```
 
 3. **List available archives**:
    ```bash
-   frostbyte ls --all
+   frostbyte ls --all  # or: fb ls --all
    ```
 
 4. **Restore a specific version**:
    ```bash
-   frostbyte restore data/experiment.csv -v 1
+   frostbyte restore data/experiment.csv -v 1  # or: fb restore data/experiment.csv -v 1
    ```
 
 5. **View statistics**:
