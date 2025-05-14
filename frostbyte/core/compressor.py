@@ -17,7 +17,7 @@ import pyarrow.parquet as pq  # type: ignore
 class Compressor:
     """Handles Parquet-based data storage and retrieval for dataset versioning."""
 
-    def __init__(self, compression_level: str = 'snappy', row_group_size: int = 100000):
+    def __init__(self, compression_level: str = 'gzip', row_group_size: int = 100000):
         """Initialize the compressor with compression settings.
 
         Args:
