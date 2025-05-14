@@ -9,6 +9,18 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+*.egg
+.eggs/
+.Python
+develop-eggs/
+downloads/
+eggs/
+parts/
+sdist/
+var/
+wheels/
+*.whl
+share/python-wheels/
 
 # Virtual environments
 venv/
