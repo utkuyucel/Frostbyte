@@ -43,11 +43,9 @@ class ArchiveManager:
     def initialize(self) -> bool:
         """Initialize a new Frostbyte repository in the current directory."""
         try:
-            # Create directories if they don't exist
             self.frostbyte_dir.mkdir(exist_ok=True)
             self.archives_dir.mkdir(exist_ok=True)
             
-            # Initialize the metadata store
             self.store.initialize()
             
             return True
@@ -60,31 +58,24 @@ class ArchiveManager:
         file_path_obj = Path(file_path).resolve()
         file_path_str = str(file_path_obj)
         
-        # Get file information
         file_hash = get_file_hash(file_path_obj)
         original_size = get_file_size(file_path_obj)
         
-        # Extract schema and statistics
         schema = extract_schema(file_path_obj)
         row_count = schema.get('row_count', 0)
         
-        # Get the next version number
         version = self.store.get_next_version(file_path_str)
         
-        # Create archive name
         archive_name = f"{file_path_obj.stem}_v{version}.parquet"
         archive_path = self.archives_dir / archive_name
         
-        # Check if file is smaller than 10MB threshold (10 * 1024 * 1024 bytes)
         compress_threshold = 10 * 1024 * 1024  # 10 MB in bytes
         should_compress = original_size >= compress_threshold
         
         if should_compress:
-            # Compress the file
             logger.info(f"Compressing file: {file_path} ({original_size / (1024*1024):.2f} MB)")
             _, compressed_size = self.compressor.compress(file_path, archive_path)
         else:
-            # Skip compression for small files, just copy the file
             import shutil
             logger.info(f"Skipping compression for small file: {file_path} ({original_size / 1024:.2f} KB)")
             shutil.copy2(file_path, archive_path)
@@ -92,7 +83,6 @@ class ArchiveManager:
             
         compression_ratio = 100 * (1 - (compressed_size / original_size)) if original_size > 0 else 0
         
-        # Record metadata
         archive_id = str(uuid.uuid4())
         original_extension = file_path_obj.suffix
         self.store.add_archive(
@@ -125,14 +115,10 @@ class ArchiveManager:
             path_spec: Path or name of the file to restore
             version: Specific version to restore (if None, latest version is used)
         """
-        # Normalize path for consistent matching
         normalized_path_spec = str(Path(path_spec).resolve()) if os.path.exists(path_spec) else path_spec
         
-        # Check for archive filename pattern (_v#.parquet)
         if "_v" in path_spec and path_spec.endswith(".parquet"):
-            # Extract version from the archive filename if present
             try:
-                # Parse potential archive filename (e.g., 'customer_data_v1.parquet')
                 matches = self.find_by_name(path_spec)
                 if matches:
                     if len(matches) == 1:
@@ -143,17 +129,14 @@ class ArchiveManager:
                             archive_version
                         )
                     else:
-                        # Multiple matching archive filenames
                         match_paths = [f"{m['original_path']} (v{m['latest_version']})" for m in matches]
                         matches_str = '\n  '.join(match_paths)
                         raise ValueError(f"Multiple archives match '{path_spec}':\n  {matches_str}\nPlease be more specific.")
                 else:
                     raise ValueError(f"No archives found matching: {path_spec}")
             except ValueError:
-                # If parsing fails, continue to regular path handling
                 archive_info = None
         else:
-            # Try both approaches - get by exact path and by basename
             if version is not None:
                 # First try exact path with version
                 archive_info = self.store.get_archive(normalized_path_spec, version)
@@ -161,13 +144,10 @@ class ArchiveManager:
                 # If not found, try using the basename with version
                 if not archive_info:
                     basename = Path(path_spec).name
-                    # Try to search by basename
                     matches = self.find_by_name(basename)
                     if matches:
-                        # Filter matches by version if specified
                         versioned_matches = []
                         for match in matches:
-                            # Check if this path's latest version matches our requested version
                             match_info = self.store.get_archive(match['original_path'], version)
                             if match_info:
                                 versioned_matches.append(match_info)
@@ -175,7 +155,6 @@ class ArchiveManager:
                         if len(versioned_matches) == 1:
                             archive_info = versioned_matches[0]
                         elif len(versioned_matches) > 1:
-                            # Multiple matches with same version
                             match_paths = [f"{m['original_path']} (v{version})" for m in versioned_matches]
                             matches_str = '\n  '.join(match_paths)
                             raise ValueError(f"Multiple archives found with version {version}:\n  {matches_str}\nPlease be more specific.")
@@ -193,7 +172,6 @@ class ArchiveManager:
                         raise ValueError(f"No archives found matching: {path_spec}")
                     
                     if len(matches) > 1:
-                        # If multiple matches, show options to the user
                         match_paths = [f"{m['original_path']} (v{m['latest_version']})" for m in matches]
                         matches_str = '\n  '.join(match_paths)
                         raise ValueError(f"Multiple archives match '{path_spec}':\n  {matches_str}\nPlease be more specific or use the full path.")
@@ -213,12 +191,8 @@ class ArchiveManager:
         original_extension = archive_info.get('original_extension')
 
         if not original_extension:
-            # Fallback or raise error if original_extension is missing
-            # For now, let's assume it might be an older archive and try to infer or default
-            # A more robust solution would be to ensure all archives have this
-            # or handle the case explicitly (e.g. by asking user or defaulting to .csv)
+            # Complex fallback logic for missing extension
             print(f"Warning: Original extension not found for {storage_path}. Attempting to restore as Parquet's original format if possible, or to a default.")
-            # Defaulting to .csv if not found, or could raise error
             original_extension = original_path.suffix or '.csv'
 
 
@@ -233,22 +207,18 @@ class ArchiveManager:
         # Get the compression ratio
         compression_ratio = archive_info.get('compression_ratio', 0)
         
-        # Calculate original file size - either from schema or from the actual file
         original_size = 0
         if schema:
-            # Try to get size from schema
             if 'file_size_bytes' in schema:
                 original_size = schema.get('file_size_bytes', 0)
             elif 'row_count' in schema and 'avg_row_bytes' in schema:
                 original_size = schema['row_count'] * schema['avg_row_bytes']
         
-        # If we couldn't get the original size from schema, try getting it from disk
+        # Complex size estimation from disk if not available in schema
         if not original_size:
-            # Get the storage path and try to calculate size from it
             storage_path = Path(archive_info['storage_path'])
             if storage_path.exists():
                 storage_size = storage_path.stat().st_size
-                # If we have compression ratio, estimate original size
                 if compression_ratio:
                     if compression_ratio != 100:  # avoid division by zero
                         original_size = storage_size / (1 - compression_ratio / 100)
@@ -257,14 +227,11 @@ class ArchiveManager:
                 else:
                     original_size = storage_size
         
-        # Calculate compressed size
         compressed_size = 0
         if original_size:
             if compression_ratio >= 0:
-                # Normal case - positive compression ratio
                 compressed_size = original_size * (1 - compression_ratio / 100)
             else:
-                # Negative compression ratio case (file got bigger)
                 compressed_size = original_size * (1 + abs(compression_ratio) / 100)
         
         return {
@@ -292,13 +259,11 @@ class ArchiveManager:
             version: Specific version to purge (if None and all_versions is False, latest version is purged)
             all_versions: If True, purge all versions of the file
         """
-        # If all_versions is True, version is ignored
         if all_versions:
             version = None
             
         result = self.store.remove_archives(file_path, int(version) if version is not None else None, all_versions)
         
-        # Remove physical files
         for archive_path in result.get('storage_paths', []):
             try:
                 Path(archive_path).unlink(missing_ok=True)

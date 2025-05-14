@@ -21,14 +21,11 @@ class MetadataStore:
         
     def initialize(self) -> None:
         """Create the database schema, deleting any existing database."""
-        # Delete existing database file if it exists
         if self.db_path.exists():
             self.db_path.unlink()
             
-        # Make sure the parent directory exists
         self.db_path.parent.mkdir(exist_ok=True)
         
-        # Connect to DuckDB
         conn = duckdb.connect(str(self.db_path))
         
         try:
@@ -291,9 +288,7 @@ class MetadataStore:
         Returns:
             Dict: Information about the removed entries
         """
-        # Normalize the path to avoid path comparison issues
-        normalized_path = str(Path(file_path).resolve())
-        
+        # We use file basename for LIKE queries below, so no need to normalize here
         conn = duckdb.connect(str(self.db_path))
         
         try:
