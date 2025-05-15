@@ -4,6 +4,7 @@ Command line interface implementation for Frostbyte.
 This module provides the command implementations for the Frostbyte CLI.
 """
 
+import logging
 import sys
 import time
 from pathlib import Path
@@ -119,6 +120,10 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
         start_time = time.time()
         last_update_time = 0.0  # Use float for time consistency
         estimated_size = 0  # Will be updated once we have info
+        
+        # Temporarily disable INFO logging from the compressor to avoid duplicate progress output
+        compressor_logger = logging.getLogger("frostbyte.compressor")
+        compressor_logger.setLevel(logging.WARNING)
 
         def progress_callback(progress: float) -> None:
             """Progress callback for the restore operation with enhanced visual feedback."""
@@ -185,8 +190,13 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
         # Start timer
         start_time = time.time()
 
-        # Call restore with the progress callback
-        result = frostbyte.restore(path_spec, version, progress_callback)
+        try:
+            # Call restore with the progress callback
+            result = frostbyte.restore(path_spec, version, progress_callback)
+        finally:
+            # Restore original logging level regardless of success/failure
+            compressor_logger = logging.getLogger("frostbyte.compressor")
+            compressor_logger.setLevel(logging.INFO)
 
         # Format file sizes for display
         def format_size(size_bytes: float) -> str:
