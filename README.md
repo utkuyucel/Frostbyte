@@ -1,160 +1,126 @@
 # Frostbyte
 
-> Cold Data Archiving for Pandas Workflows
+> Cold Data Archiving for Data Workflows
 
-Frostbyte is a lightweight, local-first cold data archiving tool for data engineers, scientists, and ML practitioners. It enables efficient compression, versioning, and management of large, infrequently accessed datasets (CSV, Parquet) without relying on cloud infrastructure.
+Frostbyte is a lightweight tool that compresses, versions, and manages your large data files (CSV, Parquet, Excel). Perfect for data scientists and analysts who need to save disk space while keeping data organized.
+
+##  Workflow
+
+```mermaid
+%% Detailed User Workflow
+flowchart TD
+    subgraph "Setup"
+        Init[Initialize Repository] -->|fb init| Config[Configure Settings]
+    end
+    
+    subgraph "Data Management"
+        Raw[Raw Data File] -->|Process & Clean| Processed[Processed Data]
+        Processed -->|fb archive| Archive[Archive File]
+        Archive -->|fb ls| List[List Archives]
+        List -->|fb stats| Stats[View Statistics]
+        Stats -->|Space Savings| Decision{Need File?}
+        Decision -->|Yes| Restore[Restore File]
+        Decision -->|No| Keep[Keep Archived]
+        Restore -->|fb restore| Working[Working Data]
+        Working -->|Modify| NewVersion[New Version]
+        NewVersion -->|fb archive| Archive
+    end
+    
+    subgraph "Version Control"
+        V1[Version 1] -->|fb archive| V2[Version 2]
+        V2 -->|fb archive| V3[Version 3]
+        V3 -.->|fb restore -v 1| V1
+    end
+    
+    Init -.-> Raw
+```
 
 ## Features
 
-- **Efficient Compression**: Minimize disk usage for stale or infrequently used datasets
-- **Data Versioning**: Maintain reproducible data versions with schema and content metadata
-- **Simple Commands**: Archive, restore, and inspect data files with intuitive commands
-- **Extensible**: Built to be extended with different backends and UIs
+- **Space-Saving Compression**: Reduce storage needs for large datasets
+- **Simple Versioning**: Track changes in your data files
+- **Easy Commands**: Intuitive CLI with short aliases
+- **Local First**: No cloud dependencies, works completely offline
 
-## Installation
+## Quick Installation
 
 ```bash
-# Install from source
+# From source
 git clone https://github.com/utkuyucel/Frostbyte.git
-cd frostbyte
+cd Frostbyte
 
-# Create virtual environment and install
-```
-
-## Development
-
-### Code Quality
-
-Frostbyte uses several linting tools to maintain code quality:
-
-```bash
-# Run all linters (check only), respecting .gitignore patterns
-./lint.sh --check
-
-# Run all linters and fix issues automatically (default)
-./lint.sh
-
-# Run linters on all files, including ignored ones
-./lint.sh --ignore-git
-```
-
-The linting script automatically respects `.gitignore` patterns to avoid processing virtual environments and other excluded files. See [Linting Guide](docs/linting.md) for more details.
+# Setup environment
 python -m venv frostbyte_venv
-source frostbyte_venv/bin/activate  # On Windows: frostbyte_venv\Scripts\activate
+source frostbyte_venv/bin/activate
 
-# Install the package
+# Install
 pip install -e .
-
-# Or from PyPI (once published)
-# pip install frostbyte
 ```
 
-## Quick Start
+## Simple Usage Scenarios
+
+### Scenario 1: Archive Dataset After Processing
 
 ```bash
-# Initialize Frostbyte in your project
-frostbyte init  # or use the shorter alias: fb init
-
-# Archive a CSV file
-frostbyte archive data/cleaned.csv  # or: fb archive data/cleaned.csv
-
-# List archived files
-frostbyte ls  # or: fb ls
-
-# Get stats about your archives
-frostbyte stats  # or: fb stats
-
-# Restore an archived file (latest version)
-frostbyte restore data/cleaned.csv  # or: fb restore data/cleaned.csv
-
-# Restore by archive filename 
-frostbyte restore cleaned_v1.csv.fbyt  # or: fb restore cleaned_v1.csv.fbyt
-
-# Restore by partial name match
-frostbyte restore cleaned  # or: fb restore cleaned
-
-
+# Create an archive of your processed data 
+fb archive processed_data.csv
 ```
 
-## Usage Examples
+### Scenario 2: Free Up Disk Space
 
-### Typical Workflow
+```bash
+# See how much space you'll save
+fb stats large_dataset.csv
 
-1. **Initialize a new project**:
-   ```bash
-   frostbyte init  # or: fb init
-   ```
+# Archive the file
+fb archive large_dataset.csv
 
-2. **Archive a file after processing**:
-   ```bash
-   frostbyte archive data/experiment.csv  # or: fb archive data/experiment.csv
-   ```
+# Verify it's archived
+fb ls
+```
 
-3. **List available archives**:
-   ```bash
-   frostbyte ls --all  # or: fb ls --all
-   ```
+### Scenario 3: Restore Data for Analysis
 
-4. **Restore a specific version**:
-   ```bash
-   frostbyte restore data/experiment.csv -v 1  # or: fb restore data/experiment.csv -v 1
-   ```
+```bash
+# List what's available
+fb ls
 
-5. **View statistics**:
-   ```bash
-   frostbyte stats data/experiment.csv
-   ```
+# Restore the file you need
+fb restore large_dataset.csv
+```
 
-### Data Versioning Workflow
+### Scenario 4: Work with Multiple Versions
 
-For a comprehensive guide on how to use Frostbyte for data versioning, including:
-- Creating multiple versions of a dataset
-- Listing and reviewing version history
-- Getting statistics about your archives
-- Restoring specific versions
-- Handling branching workflows
+```bash
+# Archive your file
+fb archive dataset.csv
 
-See our detailed [Data Versioning with Frostbyte](docs/versioning-workflow.md) guide.
+# Later, after changes, archive again
+fb archive dataset.csv  # Creates version 2
 
+# List all versions
+fb ls --all
 
+# Restore a specific version
+fb restore dataset.csv -v 1
+```
 
 ## Command Reference
 
-| Command                     | Description                                          |
-|-----------------------------|------------------------------------------------------|
-| `frostbyte init`            | Initialize project, create `.frostbyte/` directory (**CAUTION**: recreates DB if exists, requires confirmation) |
-| `frostbyte archive <path>`  | Compress file, record metadata                       |
-| `frostbyte restore <path-spec> [-v VERSION]` | Decompress and restore file using various formats: path with optional version parameter (e.g., `data.csv -v 2`), archive filename (e.g., `data_v2.parquet`), or partial name (e.g., `data`) |
-| `frostbyte ls`              | List summary of archived files with latest versions  |
-| `frostbyte ls --all`        | List all versions with detailed info (date, size, filename) |
-| `frostbyte stats [<file>]`  | Show size savings, last access, total versions       |
-| `frostbyte purge <file>`    | Remove archive versions or entire file from storage  |
+| Command | Description | Example |
+|---------|-------------|---------|
+| `fb init` | Setup Frostbyte in your project | `fb init` |
+| `fb archive <file>` | Compress and store a file | `fb archive data.csv` |
+| `fb ls` | List archived files | `fb ls` or `fb ls --all` |
+| `fb stats [file]` | Show compression statistics | `fb stats` or `fb stats data.csv` |
+| `fb restore <file>` | Restore a file from archive | `fb restore data.csv` or `fb restore data.csv -v 2` |
+| `fb purge <file>` | Remove archive versions | `fb purge old_data.csv` |
 
-Check the [docs directory](docs/) for guides and the [examples directory](examples/) for code samples and usage examples.
-
-## Development
-
-### Prerequisites
+## Prerequisites
 
 - Python 3.8+
-- Required packages: click, pandas, numpy, duckdb, zstandard
-
-### Setup Development Environment
-
-```bash
-# Clone repository
-git clone https://github.com/utkuyucel/frostbyte.git
-cd frostbyte
-
-# Create and activate virtual environment
-python -m venv frostbyte_venv
-source frostbyte_venv/bin/activate  # On Windows: frostbyte_venv\Scripts\activate
-
-# Install development dependencies
-pip install -e .
-pip install pytest black flake8 mypy
-```
+- Packages: pandas, duckdb, pyarrow, click
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+[MIT License](LICENSE)
