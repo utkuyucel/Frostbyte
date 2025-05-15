@@ -33,7 +33,8 @@ class Compressor:
         self.row_group_size = row_group_size
 
     def compress(
-        self, source_path: Union[str, Path], target_path: Optional[Union[str, Path]] = None
+        self, source_path: Union[str, Path], target_path: Optional[Union[str, Path]] = None,
+        progress_callback: Optional[Callable[[float], None]] = None
     ) -> Tuple[Path, int]:
         """Convert any data file to Parquet format and return the path and compressed file size.
 
@@ -41,6 +42,7 @@ class Compressor:
             source_path: Path to the source data file
             target_path: Optional path for the output file. If not provided, uses source
                 path with .parquet extension
+            progress_callback: Optional callback function to report progress (0.0 to 1.0)
 
         Returns:
             tuple: (Path to parquet file, size in bytes)
@@ -59,8 +61,17 @@ class Compressor:
         # Create directories if they don't exist
         target_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # Report initial progress
+        if progress_callback:
+            progress_callback(0.01)  # Initial progress indicator
+        
         # Read the source file based on its extension
         file_ext = source_path.suffix.lower()
+        
+        # Report progress at file reading stage
+        if progress_callback:
+            progress_callback(0.05)  # Started reading file
+        
         if file_ext == ".csv":
             df = pd.read_csv(source_path)
         elif file_ext in (".xls", ".xlsx", ".xlsm"):
@@ -71,9 +82,17 @@ class Compressor:
             raise ValueError(
                 f"Unsupported format: {file_ext}. Supported formats: CSV, Excel, and Parquet."
             )
-
+            
+        # Report progress after file reading complete
+        if progress_callback:
+            progress_callback(0.4)  # File reading complete, starting compression
+            
         # Write to Parquet format with compression
-        self._save_dataframe(df, target_path)
+        self._save_dataframe(df, target_path, progress_callback)
+        
+        # Final progress update
+        if progress_callback:
+            progress_callback(1.0)  # Compression complete
 
         return target_path, target_path.stat().st_size
 
@@ -82,12 +101,29 @@ class Compressor:
         source_path = Path(source_path)
         return pd.read_parquet(source_path)
 
-    def _save_dataframe(self, df: pd.DataFrame, target_path: Path) -> int:
+    def _save_dataframe(
+        self, 
+        df: pd.DataFrame, 
+        target_path: Path,
+        progress_callback: Optional[Callable[[float], None]] = None
+    ) -> int:
         """Save DataFrame to Parquet format and return file size."""
+        # Convert DataFrame to Arrow Table
+        if progress_callback:
+            progress_callback(0.5)  # DataFrame conversion to Arrow Table
+            
         table = pa.Table.from_pandas(df)
+        
+        if progress_callback:
+            progress_callback(0.7)  # Starting Parquet write
+            
         pq.write_table(
             table, target_path, compression=self.compression, row_group_size=self.row_group_size
         )
+        
+        if progress_callback:
+            progress_callback(0.95)  # Parquet write complete
+            
         return target_path.stat().st_size
 
     def compute_hash(self, file_path: Union[str, Path]) -> str:

@@ -51,12 +51,14 @@ class ArchiveManager:
             print(f"Error initializing Frostbyte: {e}")
             return False
 
-    def archive(self, file_path: str, quiet: bool = False) -> Dict:
+    def archive(self, file_path: str, quiet: bool = False, 
+              progress_callback: Optional[Callable[[float], None]] = None) -> Dict:
         """Archive a file and return information about the archived file.
         
         Args:
             file_path: Path to the file to archive
             quiet: If True, suppresses informational log messages
+            progress_callback: Optional callback function to report progress (0.0 to 1.0)
         """
         file_path_obj = Path(file_path).resolve()
         file_path_str = str(file_path_obj)
@@ -89,7 +91,9 @@ class ArchiveManager:
                 )
 
         # Always convert to parquet format regardless of file size
-        target_path, compressed_size = self.compressor.compress(file_path, archive_path)
+        target_path, compressed_size = self.compressor.compress(
+            file_path, archive_path, progress_callback
+        )
 
         compression_ratio = (
             100 * (1 - (compressed_size / original_size)) if original_size > 0 else 0
@@ -244,7 +248,8 @@ class ArchiveManager:
             decompress_result = self.compressor.decompress(
                 storage_path, original_path, original_extension, progress_callback
             )
-            execution_time = time.time() - start_time
+            # Store execution time in the result
+            decompress_result["execution_time"] = time.time() - start_time
         except ValueError as e:
             if "Invalid Parquet file" in str(e) or "Parquet magic bytes" in str(e):
                 # This likely means the file wasn't properly converted to parquet format

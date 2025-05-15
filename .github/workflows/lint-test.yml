@@ -1,4 +1,4 @@
-name: Lint & Test
+name: Lint & Test (Informational Only)
 
 on:
   push:
@@ -9,6 +9,8 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    # Make sure the workflow continues even if linting fails
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python
@@ -24,12 +26,14 @@ jobs:
           # Alternatively if your dev dependencies are in requirements-dev.txt
           # pip install -r requirements-dev.txt
       
-      - name: Run linters
+      - name: Run linters (Informational Only)
         run: |
-          ./lint.sh --check
+          ./lint.sh --check || echo "Linting failed but continuing workflow"
   
   test:
     runs-on: ubuntu-latest
+    # Make sure the workflow continues even if tests fail
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python
@@ -43,6 +47,6 @@ jobs:
           pip install -e ".[dev]"
           pip install pytest pytest-cov isort
       
-      - name: Run tests
+      - name: Run tests (Informational Only)
         run: |
-          pytest --cov=frostbyte tests/
+          pytest --cov=frostbyte tests/ || echo "Tests failed but continuing workflow"

@@ -35,14 +35,16 @@ def init() -> bool:
     return get_manager().initialize()
 
 
-def archive(file_path: str, quiet: bool = False) -> Dict:
+def archive(file_path: str, quiet: bool = False,
+         progress_callback: Optional[Callable[[float], None]] = None) -> Dict:
     """Archive a file and store its metadata.
     
     Args:
         file_path: Path to the file to archive
         quiet: If True, suppresses informational log messages
+        progress_callback: Optional callback function to report progress (0.0 to 1.0)
     """
-    return get_manager().archive(file_path, quiet=quiet)
+    return get_manager().archive(file_path, quiet=quiet, progress_callback=progress_callback)
 
 
 def restore(
