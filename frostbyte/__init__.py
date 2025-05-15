@@ -35,9 +35,14 @@ def init() -> bool:
     return get_manager().initialize()
 
 
-def archive(file_path: str) -> Dict:
-    """Archive a file and store its metadata."""
-    return get_manager().archive(file_path)
+def archive(file_path: str, quiet: bool = False) -> Dict:
+    """Archive a file and store its metadata.
+    
+    Args:
+        file_path: Path to the file to archive
+        quiet: If True, suppresses informational log messages
+    """
+    return get_manager().archive(file_path, quiet=quiet)
 
 
 def restore(

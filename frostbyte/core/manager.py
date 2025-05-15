@@ -51,8 +51,13 @@ class ArchiveManager:
             print(f"Error initializing Frostbyte: {e}")
             return False
 
-    def archive(self, file_path: str) -> Dict:
-        """Archive a file and return information about the archived file."""
+    def archive(self, file_path: str, quiet: bool = False) -> Dict:
+        """Archive a file and return information about the archived file.
+        
+        Args:
+            file_path: Path to the file to archive
+            quiet: If True, suppresses informational log messages
+        """
         file_path_obj = Path(file_path).resolve()
         file_path_str = str(file_path_obj)
 
@@ -70,17 +75,18 @@ class ArchiveManager:
         compress_threshold = 10 * 1024 * 1024  # 10 MB in bytes
         should_optimize_compression = original_size >= compress_threshold
 
-        if should_optimize_compression:
-            logger.info(
-                f"Optimizing compression for large file: {file_path} "
-                f"({original_size / (1024 * 1024):.2f} MB)"
-            )
-            # For larger files, we might apply more aggressive compression in the future
-        else:
-            logger.info(
-                f"Using standard compression for small file: {file_path} "
-                f"({original_size / 1024:.2f} KB)"
-            )
+        if not quiet:
+            if should_optimize_compression:
+                logger.info(
+                    f"Optimizing compression for large file: {file_path} "
+                    f"({original_size / (1024 * 1024):.2f} MB)"
+                )
+                # For larger files, we might apply more aggressive compression in the future
+            else:
+                logger.info(
+                    f"Using standard compression for small file: {file_path} "
+                    f"({original_size / 1024:.2f} KB)"
+                )
 
         # Always convert to parquet format regardless of file size
         target_path, compressed_size = self.compressor.compress(file_path, archive_path)
