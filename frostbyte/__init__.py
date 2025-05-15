@@ -11,39 +11,26 @@ from typing import Callable, Dict, List, Optional
 from frostbyte.core.manager import ArchiveManager
 
 
-# Use a class to manage singleton instance instead of global variables
 class _ManagerProvider:
-    """Singleton provider for archive manager instance."""
-
     _instance: Optional[ArchiveManager] = None
 
     @classmethod
     def get(cls) -> ArchiveManager:
-        """Get or create the archive manager instance."""
         if cls._instance is None:
             cls._instance = ArchiveManager()
         return cls._instance
 
 
 def get_manager() -> ArchiveManager:
-    """Get the archive manager instance."""
     return _ManagerProvider.get()
 
 
 def init() -> bool:
-    """Initialize a new Frostbyte repository."""
     return get_manager().initialize()
 
 
 def archive(file_path: str, quiet: bool = False,
          progress_callback: Optional[Callable[[float], None]] = None) -> Dict:
-    """Archive a file and store its metadata.
-    
-    Args:
-        file_path: Path to the file to archive
-        quiet: If True, suppresses informational log messages
-        progress_callback: Optional callback function to report progress (0.0 to 1.0)
-    """
     return get_manager().archive(file_path, quiet=quiet, progress_callback=progress_callback)
 
 
@@ -52,37 +39,20 @@ def restore(
     version: Optional[int] = None,
     progress_callback: Optional[Callable[[float], None]] = None,
 ) -> Dict:
-    """Restore an archived file using path, version, archive filename, or partial name.
-
-    Args:
-        path_spec: Path or name of the file to restore
-        version: Specific version to restore (if None, latest version is used)
-        progress_callback: Optional callback function to report progress (0.0 to 1.0)
-    """
     return get_manager().restore(path_spec, version, progress_callback)
 
 
 def ls(show_all: bool = False) -> List[Dict]:
-    """List archived files, optionally showing all versions."""
     return get_manager().list_archives(show_all)
 
 
 def stats(file_path: Optional[str] = None) -> Dict:
-    """Get statistics about archived files, for specific file or all archives."""
     return get_manager().get_stats(file_path)
 
 
 def purge(file_path: str, version: Optional[int] = None, all_versions: bool = False) -> Dict:
-    """Remove specific archive versions or all versions of a file.
-
-    Args:
-        file_path: Path of the file to purge
-        version: Specific version to purge (latest is used if None and all_versions is False)
-        all_versions: If True, purge all versions of the file
-    """
     return get_manager().purge(file_path, version, all_versions)
 
 
 def find_by_name(name_part: str) -> List[Dict]:
-    """Find archives by partial filename match."""
     return get_manager().find_by_name(name_part)

@@ -1,9 +1,3 @@
-"""
-Configuration management for Frostbyte.
-
-Handles reading, writing, and validating Frostbyte configuration.
-"""
-
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -21,15 +15,7 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
 
 
 class Config:
-    """Configuration manager for Frostbyte."""
-
     def __init__(self, config_path: Optional[str] = None):
-        """
-        Initialize configuration manager.
-
-        Args:
-            config_path: Path to configuration file, or None for default.
-        """
         if config_path:
             self.config_path = Path(config_path)
         else:
@@ -39,7 +25,6 @@ class Config:
         self._load()
 
     def _load(self) -> None:
-        """Load configuration from file if it exists."""
         if self.config_path.exists():
             try:
                 with open(self.config_path) as f:
@@ -57,24 +42,12 @@ class Config:
                 print(f"Warning: Failed to load config from {self.config_path}: {e}")
 
     def save(self) -> None:
-        """Save current configuration to file."""
         self.config_path.parent.mkdir(exist_ok=True)
 
         with open(self.config_path, "w") as f:
             yaml.dump(self.config, f, default_flow_style=False)
 
     def get(self, section: str, key: str, default: Any = None) -> Any:
-        """
-        Get a configuration value.
-
-        Args:
-            section: Configuration section
-            key: Configuration key
-            default: Default value if not found
-
-        Returns:
-            Configuration value or default
-        """
         return self.config.get(section, {}).get(key, default)
 
     def set(self, section: str, key: str, value: Any) -> None:

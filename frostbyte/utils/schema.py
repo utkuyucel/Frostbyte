@@ -1,7 +1,3 @@
-"""
-Schema extraction functionality for Frostbyte.
-"""
-
 import os
 from pathlib import Path
 from typing import Any, Dict, Union
@@ -10,15 +6,6 @@ import pandas as pd
 
 
 def extract_schema(file_path: Union[str, Path]) -> Dict[str, Any]:
-    """
-    Extract schema information from a CSV or Parquet file.
-
-    Args:
-        file_path: Path to the file
-
-    Returns:
-        Dict[str, Any]: Schema information including column types, stats, etc.
-    """
     file_path = Path(file_path)
 
     # Determine file type from extension

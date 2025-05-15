@@ -14,10 +14,7 @@ from frostbyte.utils.json_utils import json_dumps
 
 
 class MetadataStore:
-    """Handles database interactions for Frostbyte metadata."""
-
     def __init__(self, db_path: Union[str, Path]):
-        """Initialize the metadata store with database path."""
         self.db_path = Path(db_path)
         # For in-memory databases, keep one persistent connection
         if str(self.db_path) == ":memory:":
@@ -26,13 +23,11 @@ class MetadataStore:
             self._conn = None
 
     def _connect(self) -> duckdb.DuckDBPyConnection:
-        """Return a connection: persistent for memory, new for file."""
         if self._conn:
             return self._conn
         return duckdb.connect(str(self.db_path))
 
     def initialize(self) -> None:
-        """Create the database schema, deleting any existing database."""
         # Remove existing file if on disk
         if self._conn is None and self.db_path.exists():
             self.db_path.unlink()
@@ -93,7 +88,6 @@ class MetadataStore:
         storage_path: str,
         original_extension: Optional[str] = None,
     ) -> None:
-        """Add a new archive entry to the database with associated metadata."""
         conn = self._connect()
         try:
             conn.execute(
@@ -140,7 +134,6 @@ class MetadataStore:
                 conn.close()
 
     def get_next_version(self, file_path: str) -> int:
-        """Get the next sequential version number for a file."""
         normalized_path = str(Path(file_path).resolve())
         conn = self._connect()
         try:
@@ -160,7 +153,6 @@ class MetadataStore:
     def get_archive(
         self, file_path: str, version: Optional[Union[int, float]] = None
     ) -> Optional[Dict]:
-        """Get information about an archived file, optionally by specific version."""
         normalized_path = str(Path(file_path).resolve())
         conn = self._connect()
         try:
@@ -207,7 +199,6 @@ class MetadataStore:
                 conn.close()
 
     def list_archives(self, show_all: bool = False) -> List[Dict]:
-        """List archived files, optionally showing all versions."""
         conn = self._connect()
         try:
             if show_all:

@@ -1,9 +1,3 @@
-"""
-Command line interface implementation for Frostbyte.
-
-This module provides the command implementations for the Frostbyte CLI.
-"""
-
 import logging
 import sys
 import time
@@ -19,12 +13,7 @@ import frostbyte
 @click.group()
 @click.version_option(version=frostbyte.__version__)
 def cli() -> None:
-    """
-    Frostbyte: Cold Data Archiving for Pandas Workflows.
-
-    A lightweight, local-first cold data archiving tool for managing
-    large, infrequently accessed datasets.
-    """
+    """Frostbyte: Cold Data Archiving for Pandas Workflows."""
     pass
 
 
@@ -70,7 +59,6 @@ def archive_cmd(path: str) -> None:
         compressor_logger.setLevel(logging.WARNING)
 
         def progress_callback(progress: float) -> None:
-            """Progress callback for the archive operation with enhanced visual feedback."""
             nonlocal progress_bar, start_time, last_update_time
             current_time = time.time()
 
@@ -183,7 +171,6 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
     try:
         # Define a function to format file size
         def format_progress_size(size_bytes: float) -> str:
-            """Format bytes to human-readable size."""
             if size_bytes >= 1024**3:  # GB
                 return f"{size_bytes / 1024**3:.2f} GB"
             if size_bytes >= 1024**2:  # MB

@@ -1,10 +1,3 @@
-"""
-Compression functionality for Frostbyte.
-
-Provides Parquet-based data storage for efficient dataset versioning and management.
-Uses Parquet format exclusively for columnar compression of data files.
-"""
-
 import hashlib
 import logging
 import time
@@ -15,20 +8,11 @@ import pandas as pd
 import pyarrow as pa  # type: ignore
 import pyarrow.parquet as pq  # type: ignore
 
-# Configure logging if it hasn't been configured yet
 logger = logging.getLogger("frostbyte.compressor")
 
 
 class Compressor:
-    """Handles Parquet-based data storage and retrieval for dataset versioning."""
-
     def __init__(self, compression_level: str = "gzip", row_group_size: int = 100000):
-        """Initialize the compressor with compression settings.
-
-        Args:
-            compression_level: Parquet compression codec ('snappy', 'gzip', 'brotli', etc.)
-            row_group_size: Number of rows per row group in Parquet file
-        """
         self.compression = compression_level
         self.row_group_size = row_group_size
 
@@ -36,17 +20,6 @@ class Compressor:
         self, source_path: Union[str, Path], target_path: Optional[Union[str, Path]] = None,
         progress_callback: Optional[Callable[[float], None]] = None
     ) -> Tuple[Path, int]:
-        """Convert any data file to Parquet format and return the path and compressed file size.
-
-        Args:
-            source_path: Path to the source data file
-            target_path: Optional path for the output file. If not provided, uses source
-                path with .parquet extension
-            progress_callback: Optional callback function to report progress (0.0 to 1.0)
-
-        Returns:
-            tuple: (Path to parquet file, size in bytes)
-        """
         source_path = Path(source_path)
 
         # If no target path is provided, use source path with .parquet extension
@@ -97,7 +70,6 @@ class Compressor:
         return target_path, target_path.stat().st_size
 
     def read_parquet(self, source_path: Union[str, Path]) -> pd.DataFrame:
-        """Read a Parquet file and return as DataFrame."""
         source_path = Path(source_path)
         return pd.read_parquet(source_path)
 
@@ -107,7 +79,6 @@ class Compressor:
         target_path: Path,
         progress_callback: Optional[Callable[[float], None]] = None
     ) -> int:
-        """Save DataFrame to Parquet format and return file size."""
         # Convert DataFrame to Arrow Table
         if progress_callback:
             progress_callback(0.5)  # DataFrame conversion to Arrow Table
@@ -127,10 +98,7 @@ class Compressor:
         return target_path.stat().st_size
 
     def compute_hash(self, file_path: Union[str, Path]) -> str:
-        """Compute SHA-256 hash of parquet file contents for versioning."""
         file_path = Path(file_path)
-
-        # For Parquet files, hash the raw content
         hasher = hashlib.sha256()
         with open(file_path, "rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):
@@ -138,13 +106,6 @@ class Compressor:
         return hasher.hexdigest()
 
     def compare_datasets(self, path1: Union[str, Path], path2: Union[str, Path]) -> Dict[str, Any]:
-        """Compare two Parquet datasets and return differences.
-
-        Returns a dictionary with:
-            - row_count_diff: Difference in number of rows
-            - column_diff: List of columns that differ
-            - identical: Boolean indicating if datasets are identical
-        """
         df1 = self.read_parquet(path1)
         df2 = self.read_parquet(path2)
 

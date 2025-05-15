@@ -17,7 +17,6 @@ from frostbyte.core.store import MetadataStore
 from frostbyte.utils.file_utils import get_file_hash, get_file_size
 from frostbyte.utils.schema import extract_schema
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -27,10 +26,7 @@ logger = logging.getLogger("frostbyte")
 
 
 class ArchiveManager:
-    """Manages archiving, restoring, and queries for Frostbyte."""
-
     def __init__(self, _: Optional[str] = None):
-        """Initialize the archive manager with optional config path."""
         self.base_dir = Path(os.getcwd())
         self.frostbyte_dir = self.base_dir / ".frostbyte"
         self.archives_dir = self.frostbyte_dir / "archives"
@@ -39,7 +35,6 @@ class ArchiveManager:
         self.compressor = Compressor()
 
     def initialize(self) -> bool:
-        """Initialize a new Frostbyte repository in the current directory."""
         try:
             self.frostbyte_dir.mkdir(exist_ok=True)
             self.archives_dir.mkdir(exist_ok=True)
@@ -53,13 +48,6 @@ class ArchiveManager:
 
     def archive(self, file_path: str, quiet: bool = False, 
               progress_callback: Optional[Callable[[float], None]] = None) -> Dict:
-        """Archive a file and return information about the archived file.
-        
-        Args:
-            file_path: Path to the file to archive
-            quiet: If True, suppresses informational log messages
-            progress_callback: Optional callback function to report progress (0.0 to 1.0)
-        """
         file_path_obj = Path(file_path).resolve()
         file_path_str = str(file_path_obj)
 
@@ -79,18 +67,9 @@ class ArchiveManager:
 
         if not quiet:
             if should_optimize_compression:
-                logger.info(
-                    f"Optimizing compression for large file: {file_path} "
-                    f"({original_size / (1024 * 1024):.2f} MB)"
-                )
-                # For larger files, we might apply more aggressive compression in the future
+                logger.info(f"Compressing large file: {file_path} ({original_size / (1024 * 1024):.2f} MB)")
             else:
-                logger.info(
-                    f"Using standard compression for small file: {file_path} "
-                    f"({original_size / 1024:.2f} KB)"
-                )
-
-        # Always convert to parquet format regardless of file size
+                logger.info(f"Compressing small file: {file_path} ({original_size / 1024:.2f} KB)")
         target_path, compressed_size = self.compressor.compress(
             file_path, archive_path, progress_callback
         )
@@ -130,13 +109,6 @@ class ArchiveManager:
         version: Optional[Union[int, float]] = None,
         progress_callback: Optional[Callable[[float], None]] = None,
     ) -> Dict:
-        """Restore an archived file using path, version, archive filename, or partial name.
-
-        Args:
-            path_spec: Path or name of the file to restore
-            version: Specific version to restore (if None, latest version is used)
-            progress_callback: Optional callback function to report progress (0.0 to 1.0)
-        """
         normalized_path_spec = (
             str(Path(path_spec).resolve()) if os.path.exists(path_spec) else path_spec
         )
@@ -308,11 +280,9 @@ class ArchiveManager:
         }
 
     def list_archives(self, show_all: bool = False) -> List[Dict]:
-        """List archived files, optionally showing all versions."""
         return self.store.list_archives(show_all)
 
     def get_stats(self, file_path: Optional[str] = None) -> Dict:
-        """Get statistics about archived files, for specific file or all archives."""
         return self.store.get_stats(file_path)
 
     def purge(
@@ -321,13 +291,6 @@ class ArchiveManager:
         version: Optional[Union[int, float]] = None,
         all_versions: bool = False,
     ) -> Dict:
-        """Remove specific archive versions or all versions of a file.
-
-        Args:
-            file_path: Path of the file to purge
-            version: Specific version to purge (defaults to latest if None)
-            all_versions: If True, purge all versions of the file
-        """
         if all_versions:
             version = None
 
@@ -344,7 +307,6 @@ class ArchiveManager:
         return {"original_path": file_path, "version": version, "count": result.get("count", 0)}
 
     def _parse_version(self, version_str: str) -> Union[int, float]:
-        """Parse a version string into a numeric version."""
         try:
             if "." in version_str:
                 return float(version_str)

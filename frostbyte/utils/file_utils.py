@@ -1,14 +1,9 @@
-"""
-File utilities for Frostbyte.
-"""
-
 import hashlib
 from pathlib import Path
 from typing import Union
 
 
 def get_file_hash(file_path: Union[str, Path]) -> str:
-    """Calculate SHA-256 hash of a file."""
     file_path = Path(file_path)
     sha256 = hashlib.sha256()
 
@@ -20,6 +15,5 @@ def get_file_hash(file_path: Union[str, Path]) -> str:
 
 
 def get_file_size(file_path: Union[str, Path]) -> int:
-    """Get the size of a file in bytes."""
     file_path = Path(file_path)
     return file_path.stat().st_size

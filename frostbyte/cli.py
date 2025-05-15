@@ -1,7 +1,3 @@
-"""
-Command-line interface for Frostbyte.
-"""
-
 from typing import Optional
 
 import click
@@ -12,12 +8,7 @@ from frostbyte.core.manager import ArchiveManager
 @click.group()
 @click.version_option()
 def cli() -> None:
-    """
-    Frostbyte: Cold data archiving for pandas workflows.
-
-    A lightweight, local-first tool for efficient compression, versioning,
-    and management of large, infrequently accessed datasets.
-    """
+    """Frostbyte: Cold data archiving for pandas workflows."""
     pass
 
 

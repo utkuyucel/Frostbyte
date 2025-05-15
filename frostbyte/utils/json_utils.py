@@ -1,7 +1,3 @@
-"""
-JSON serialization utilities for Frostbyte.
-"""
-
 import json
 from typing import Any
 
@@ -10,10 +6,7 @@ import pandas as pd
 
 
 class FrostbyteJSONEncoder(json.JSONEncoder):
-    """Custom JSON encoder for Frostbyte that handles numpy types."""
-
     def default(self, obj: Any) -> Any:
-        """Convert numpy types to standard Python types for JSON serialization."""
         if isinstance(obj, np.integer):
             return int(obj)
         if isinstance(obj, np.floating):
@@ -28,10 +21,8 @@ class FrostbyteJSONEncoder(json.JSONEncoder):
 
 
 def json_dumps(obj: Any) -> str:
-    """Wrapper for json.dumps that uses FrostbyteJSONEncoder."""
     return json.dumps(obj, cls=FrostbyteJSONEncoder)
 
 
 def json_loads(json_str: str) -> Any:
-    """Wrapper for json.loads."""
     return json.loads(json_str)
