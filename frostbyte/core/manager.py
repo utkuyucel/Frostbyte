@@ -40,12 +40,12 @@ class ArchiveManager:
             self.archives_dir.mkdir(exist_ok=True)
             # Clean up existing archives
             if any(self.archives_dir.iterdir()):
-               logger.info(f"Found existing archives directory: {self.archives_dir}")
-               logger.info("Cleaning up existing archives...")
-               for archive_file in self.archives_dir.glob("*"):
-                   if archive_file.is_file():
-                       archive_file.unlink()
-                       logger.debug(f"Removed existing archive file: {archive_file}")
+                logger.info(f"Found existing archives directory: {self.archives_dir}")
+                logger.info("Cleaning up existing archives...")
+                for archive_file in self.archives_dir.glob("*"):
+                    if archive_file.is_file():
+                        archive_file.unlink()
+                        logger.debug(f"Removed existing archive file: {archive_file}")
 
             self.store.initialize()
 
