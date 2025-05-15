@@ -60,7 +60,19 @@ def init_cmd() -> None:
 def archive_cmd(path: str) -> None:
     """Compress file, record metadata."""
     try:
-        result = frostbyte.archive(path)
+        # Temporarily disable INFO logging from the compressor and frostbyte loggers
+        # to avoid duplicate progress output
+        compressor_logger = logging.getLogger("frostbyte.compressor")
+        main_logger = logging.getLogger("frostbyte")
+        compressor_logger.setLevel(logging.WARNING)
+        main_logger.setLevel(logging.WARNING)
+        
+        try:
+            result = frostbyte.archive(path)
+        finally:
+            # Restore original logging level regardless of success/failure
+            compressor_logger.setLevel(logging.INFO)
+            main_logger.setLevel(logging.INFO)
 
         # Format file sizes for display
         def format_size(size_bytes: float) -> str:
@@ -120,7 +132,7 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
         start_time = time.time()
         last_update_time = 0.0  # Use float for time consistency
         estimated_size = 0  # Will be updated once we have info
-        
+
         # Temporarily disable INFO logging from the compressor to avoid duplicate progress output
         compressor_logger = logging.getLogger("frostbyte.compressor")
         compressor_logger.setLevel(logging.WARNING)
@@ -215,7 +227,7 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
         # Get execution time either from result or by calculating it
         execution_time = result.get("execution_time", time.time() - start_time)
 
-        click.echo(click.style(f"✓ Restored: {result['original_path']}", fg="green"))
+        click.echo(click.style(f"\n✓ Restored: {result['original_path']}", fg="green"))
         click.echo(f"  Version: {result['version']}")
         click.echo(f"  Timestamp: {result['timestamp']}")
         click.echo(f"  Original size: {format_size(original_size)}")
