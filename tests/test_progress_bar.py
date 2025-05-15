@@ -81,7 +81,7 @@ class TestProgressTracking:
 
         # Either we should have intermediate values OR at least 4 different progress points
         has_intermediate_values = any(0.2 < p < 0.8 for p in progress_values)
-        has_multiple_steps = len(set([round(p, 1) for p in progress_values])) >= 4
+        has_multiple_steps = len({round(p, 1) for p in progress_values}) >= 4
 
         assert (
             has_intermediate_values or has_multiple_steps
@@ -112,5 +112,5 @@ class TestProgressTracking:
         # Check for key progress points (should be more than just 0%, 50%, 100%)
         # We're expecting to see values around 0.05, 0.1, values in 0.1-0.7 range,
         # 0.7, 0.8, 0.95, and 1.0
-        progress_points = set([round(p, 1) for p in progress_values])
+        progress_points = {round(p, 1) for p in progress_values}
         assert len(progress_points) >= 4, "Should have at least 4 distinct progress points"

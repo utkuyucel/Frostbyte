@@ -17,8 +17,10 @@ class Compressor:
         self.row_group_size = row_group_size
 
     def compress(
-        self, source_path: Union[str, Path], target_path: Optional[Union[str, Path]] = None,
-        progress_callback: Optional[Callable[[float], None]] = None
+        self,
+        source_path: Union[str, Path],
+        target_path: Optional[Union[str, Path]] = None,
+        progress_callback: Optional[Callable[[float], None]] = None,
     ) -> Tuple[Path, int]:
         source_path = Path(source_path)
 
@@ -37,14 +39,14 @@ class Compressor:
         # Report initial progress
         if progress_callback:
             progress_callback(0.01)  # Initial progress indicator
-        
+
         # Read the source file based on its extension
         file_ext = source_path.suffix.lower()
-        
+
         # Report progress at file reading stage
         if progress_callback:
             progress_callback(0.05)  # Started reading file
-        
+
         if file_ext == ".csv":
             df = pd.read_csv(source_path)
         elif file_ext in (".xls", ".xlsx", ".xlsm"):
@@ -55,14 +57,14 @@ class Compressor:
             raise ValueError(
                 f"Unsupported format: {file_ext}. Supported formats: CSV, Excel, and Parquet."
             )
-            
+
         # Report progress after file reading complete
         if progress_callback:
             progress_callback(0.4)  # File reading complete, starting compression
-            
+
         # Write to Parquet format with compression
         self._save_dataframe(df, target_path, progress_callback)
-        
+
         # Final progress update
         if progress_callback:
             progress_callback(1.0)  # Compression complete
@@ -74,27 +76,27 @@ class Compressor:
         return pd.read_parquet(source_path)
 
     def _save_dataframe(
-        self, 
-        df: pd.DataFrame, 
+        self,
+        df: pd.DataFrame,
         target_path: Path,
-        progress_callback: Optional[Callable[[float], None]] = None
+        progress_callback: Optional[Callable[[float], None]] = None,
     ) -> int:
         # Convert DataFrame to Arrow Table
         if progress_callback:
             progress_callback(0.5)  # DataFrame conversion to Arrow Table
-            
+
         table = pa.Table.from_pandas(df)
-        
+
         if progress_callback:
             progress_callback(0.7)  # Starting Parquet write
-            
+
         pq.write_table(
             table, target_path, compression=self.compression, row_group_size=self.row_group_size
         )
-        
+
         if progress_callback:
             progress_callback(0.95)  # Parquet write complete
-            
+
         return target_path.stat().st_size
 
     def compute_hash(self, file_path: Union[str, Path]) -> str:
@@ -240,25 +242,42 @@ class Compressor:
                         else:
                             batch_size = 50000  # For very large files
 
-                        # Process first batch to get headers
-                        first_batch = next(parquet_file.iter_batches(batch_size=min(1, total_rows)))
-                        df_first = pa.Table.from_batches([first_batch]).to_pandas()
+                        # For small datasets, process everything in one go
+                        if total_rows <= 10:
+                            # Read all data at once for small datasets
+                            table = pq.read_table(source_path)
+                            df = table.to_pandas()
+                            df.to_csv(csv_file, index=False, header=True, mode="w")
+                            rows_processed = len(df)
 
-                        # Write headers
-                        df_first.to_csv(csv_file, index=False, header=True, mode="w")
+                            if progress_callback:
+                                progress_callback(0.95)  # Almost done
 
-                        if progress_callback:
-                            progress_callback(0.08)  # Headers written
+                            # Skip the batch processing loop
+                            batches = []
+                            last_progress_report = 0.95
+                        else:
+                            # Process first batch to get headers
+                            first_batch = next(
+                                parquet_file.iter_batches(batch_size=min(1, total_rows))
+                            )
+                            df_first = pa.Table.from_batches([first_batch]).to_pandas()
 
-                        # Process remaining rows in chunks
-                        rows_processed = len(df_first)
-                        # Track last reported progress to avoid excessive updates
-                        last_progress_report = 0.08
+                            # Write headers
+                            df_first.to_csv(csv_file, index=False, header=True, mode="w")
 
-                        # Create batches iterator - skip first batch if we already processed it
-                        batches = parquet_file.iter_batches(batch_size=batch_size)
-                        if len(df_first) > 0:
-                            next(batches, None)  # Skip first batch if we already processed it
+                            if progress_callback:
+                                progress_callback(0.08)  # Headers written
+
+                            # Process remaining rows in chunks
+                            rows_processed = len(df_first)
+                            # Track last reported progress to avoid excessive updates
+                            last_progress_report = 0.08
+
+                            # Create batches iterator - skip first batch if we already processed it
+                            batches = parquet_file.iter_batches(batch_size=batch_size)
+                            if len(df_first) > 0:
+                                next(batches, None)  # Skip first batch if we already processed it
 
                         # Process all batches with detailed progress reporting
                         for batch_idx, batch in enumerate(batches):

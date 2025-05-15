@@ -7,7 +7,7 @@ import pandas as pd
 from frostbyte.core.compressor import Compressor
 
 
-def test_progress():
+def test_progress() -> None:
     # Create a test directory
     test_dir = Path("test_progress")
     test_dir.mkdir(exist_ok=True)
@@ -24,7 +24,7 @@ def test_progress():
     compressor = Compressor()
 
     # Define progress callback
-    def progress_callback(progress):
+    def progress_callback(progress: float) -> None:
         print(f"Progress: {progress * 100:.1f}%", end="\r")
         if progress >= 1.0:
             print("\nCompleted!")

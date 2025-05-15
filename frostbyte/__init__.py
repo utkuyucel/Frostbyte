@@ -29,8 +29,9 @@ def init() -> bool:
     return get_manager().initialize()
 
 
-def archive(file_path: str, quiet: bool = False,
-         progress_callback: Optional[Callable[[float], None]] = None) -> Dict:
+def archive(
+    file_path: str, quiet: bool = False, progress_callback: Optional[Callable[[float], None]] = None
+) -> Dict:
     return get_manager().archive(file_path, quiet=quiet, progress_callback=progress_callback)
 
 

@@ -112,8 +112,8 @@ def archive_cmd(path: str) -> None:
                 total_time = time.time() - start_time
                 # Use ternary operator for completion time string
                 time_str = (
-                    f"{total_time / 60:.1f} minutes" 
-                    if total_time >= 60 
+                    f"{total_time / 60:.1f} minutes"
+                    if total_time >= 60
                     else f"{total_time:.2f} seconds"
                 )
                 progress_bar.label = f"Archived in {time_str}"

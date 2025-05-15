@@ -46,8 +46,12 @@ class ArchiveManager:
             print(f"Error initializing Frostbyte: {e}")
             return False
 
-    def archive(self, file_path: str, quiet: bool = False, 
-              progress_callback: Optional[Callable[[float], None]] = None) -> Dict:
+    def archive(
+        self,
+        file_path: str,
+        quiet: bool = False,
+        progress_callback: Optional[Callable[[float], None]] = None,
+    ) -> Dict:
         file_path_obj = Path(file_path).resolve()
         file_path_str = str(file_path_obj)
 
@@ -67,7 +71,9 @@ class ArchiveManager:
 
         if not quiet:
             if should_optimize_compression:
-                logger.info(f"Compressing large file: {file_path} ({original_size / (1024 * 1024):.2f} MB)")
+                logger.info(
+                    f"Compressing large file: {file_path} ({original_size / (1024 * 1024):.2f} MB)"
+                )
             else:
                 logger.info(f"Compressing small file: {file_path} ({original_size / 1024:.2f} KB)")
         target_path, compressed_size = self.compressor.compress(
