@@ -15,6 +15,32 @@ known_first_party = ["frostbyte"]
 target-version = "py38"
 line-length = 100
 
+# EditorConfig settings
+[tool.editorconfig]
+# top-most EditorConfig file
+root = true
+
+# Unix-style newlines with a newline ending every file
+[tool.editorconfig."*"]
+end_of_line = "lf"
+insert_final_newline = true
+charset = "utf-8"
+trim_trailing_whitespace = true
+
+# Python
+[tool.editorconfig."*.py"]
+indent_style = "space"
+indent_size = 4
+
+# YAML files
+[tool.editorconfig."*.{yml,yaml}"]
+indent_style = "space"
+indent_size = 2
+
+# Markdown files
+[tool.editorconfig."*.md"]
+trim_trailing_whitespace = false
+
 [tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
