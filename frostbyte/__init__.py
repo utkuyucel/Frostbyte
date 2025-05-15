@@ -6,7 +6,7 @@ A lightweight, local-first tool for efficient compression, versioning, and manag
 
 __version__ = "0.1.0"
 
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from frostbyte.core.manager import ArchiveManager
 
@@ -40,14 +40,19 @@ def archive(file_path: str) -> Dict:
     return get_manager().archive(file_path)
 
 
-def restore(path_spec: str, version: Optional[int] = None) -> Dict:
+def restore(
+    path_spec: str,
+    version: Optional[int] = None,
+    progress_callback: Optional[Callable[[float], None]] = None,
+) -> Dict:
     """Restore an archived file using path, version, archive filename, or partial name.
 
     Args:
         path_spec: Path or name of the file to restore
         version: Specific version to restore (if None, latest version is used)
+        progress_callback: Optional callback function to report progress (0.0 to 1.0)
     """
-    return get_manager().restore(path_spec, version)
+    return get_manager().restore(path_spec, version, progress_callback)
 
 
 def ls(show_all: bool = False) -> List[Dict]:

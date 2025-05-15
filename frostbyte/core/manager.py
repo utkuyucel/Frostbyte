@@ -6,10 +6,11 @@ Orchestrates the archiving, restoring, and management of data files.
 
 import logging
 import os
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 from frostbyte.core.compressor import Compressor
 from frostbyte.core.store import MetadataStore
@@ -67,19 +68,22 @@ class ArchiveManager:
         archive_path = self.archives_dir / archive_name
 
         compress_threshold = 10 * 1024 * 1024  # 10 MB in bytes
-        should_compress = original_size >= compress_threshold
+        should_optimize_compression = original_size >= compress_threshold
 
-        if should_compress:
-            logger.info(f"Compressing file: {file_path} ({original_size / (1024 * 1024):.2f} MB)")
-            _, compressed_size = self.compressor.compress(file_path, archive_path)
-        else:
-            import shutil
-
+        if should_optimize_compression:
             logger.info(
-                f"Skipping compression for small file: {file_path} ({original_size / 1024:.2f} KB)"
+                f"Optimizing compression for large file: {file_path} "
+                f"({original_size / (1024 * 1024):.2f} MB)"
             )
-            shutil.copy2(file_path, archive_path)
-            compressed_size = original_size
+            # For larger files, we might apply more aggressive compression in the future
+        else:
+            logger.info(
+                f"Using standard compression for small file: {file_path} "
+                f"({original_size / 1024:.2f} KB)"
+            )
+
+        # Always convert to parquet format regardless of file size
+        target_path, compressed_size = self.compressor.compress(file_path, archive_path)
 
         compression_ratio = (
             100 * (1 - (compressed_size / original_size)) if original_size > 0 else 0
@@ -110,12 +114,18 @@ class ArchiveManager:
             "compression_ratio": compression_ratio,
         }
 
-    def restore(self, path_spec: str, version: Optional[Union[int, float]] = None) -> Dict:
+    def restore(
+        self,
+        path_spec: str,
+        version: Optional[Union[int, float]] = None,
+        progress_callback: Optional[Callable[[float], None]] = None,
+    ) -> Dict:
         """Restore an archived file using path, version, archive filename, or partial name.
 
         Args:
             path_spec: Path or name of the file to restore
             version: Specific version to restore (if None, latest version is used)
+            progress_callback: Optional callback function to report progress (0.0 to 1.0)
         """
         normalized_path_spec = (
             str(Path(path_spec).resolve()) if os.path.exists(path_spec) else path_spec
@@ -208,15 +218,36 @@ class ArchiveManager:
         original_path = Path(archive_info["original_path"])
         original_extension = archive_info.get("original_extension")
 
+        # Validate storage path exists
+        if not storage_path.exists():
+            raise FileNotFoundError(
+                f"Archive file not found: {storage_path}. "
+                f"The archive may have been deleted or moved."
+            )
+
         if not original_extension:
             # Complex fallback logic for missing extension
-            print(
-                f"Warning: Original extension not found for {storage_path}. "
+            logger.warning(
+                f"Original extension not found for {storage_path}. "
                 f"Attempting to restore using best guess format."
             )
             original_extension = original_path.suffix or ".csv"
 
-        self.compressor.decompress(storage_path, original_path, original_extension)
+        start_time = time.time()
+        try:
+            decompress_result = self.compressor.decompress(
+                storage_path, original_path, original_extension, progress_callback
+            )
+            execution_time = time.time() - start_time
+        except ValueError as e:
+            if "Invalid Parquet file" in str(e) or "Parquet magic bytes" in str(e):
+                # This likely means the file wasn't properly converted to parquet format
+                raise ValueError(
+                    f"The archive file appears to be corrupted or not in proper Parquet format. "
+                    f"This may happen with archives created in older versions. "
+                    f"Please try re-archiving the file. Error details: {e!s}"
+                ) from e
+            raise
 
         # Calculate or extract file sizes
         schema = archive_info.get("schema", {})
@@ -262,6 +293,7 @@ class ArchiveManager:
             "original_size": original_size,
             "compressed_size": compressed_size,
             "compression_ratio": compression_ratio,
+            "execution_time": decompress_result.get("execution_time", 0.0),
         }
 
     def list_archives(self, show_all: bool = False) -> List[Dict]:

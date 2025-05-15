@@ -5,6 +5,7 @@ This module provides the command implementations for the Frostbyte CLI.
 """
 
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -102,7 +103,90 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
     When using a partial name, if multiple files match, you'll be asked to be more specific.
     """
     try:
-        result = frostbyte.restore(path_spec, version)
+        # Define a function to format file size
+        def format_progress_size(size_bytes: float) -> str:
+            """Format bytes to human-readable size."""
+            if size_bytes >= 1024**3:  # GB
+                return f"{size_bytes / 1024**3:.2f} GB"
+            if size_bytes >= 1024**2:  # MB
+                return f"{size_bytes / 1024**2:.2f} MB"
+            if size_bytes >= 1024:  # KB
+                return f"{size_bytes / 1024:.2f} KB"
+            return f"{size_bytes} bytes"
+
+        # Setup for progress tracking
+        progress_bar = None
+        start_time = time.time()
+        last_update_time = 0.0  # Use float for time consistency
+        estimated_size = 0  # Will be updated once we have info
+
+        def progress_callback(progress: float) -> None:
+            """Progress callback for the restore operation with enhanced visual feedback."""
+            nonlocal progress_bar, start_time, last_update_time, estimated_size
+            current_time = time.time()
+
+            # Initialize the progress bar on first call
+            if progress_bar is None:
+                # Create a more visually appealing progress bar
+                progress_bar = click.progressbar(
+                    length=100,
+                    label="Decompressing",
+                    fill_char="█",  # Solid block for filled portion
+                    empty_char="░",  # Light shade for empty portion
+                    show_pos=True,
+                    show_percent=True,
+                    bar_template="%(label)s [%(bar)s] %(info)s",
+                )
+
+            # Convert from 0-1 to 0-100 scale
+            current = int(progress * 100)
+
+            # Update the progress bar if:
+            # 1. Progress has increased, and
+            # 2. Either it's been at least 0.1 seconds since last update OR
+            #    progress increased by at least 2%
+            enough_time_passed = current_time - last_update_time > 0.1
+            enough_progress = current - progress_bar.pos >= 2
+            progress_increased = progress_bar.pos < current
+            update_needed = progress_increased and (enough_time_passed or enough_progress)
+
+            if update_needed:
+                # Calculate and display estimated time remaining
+                elapsed = current_time - start_time
+                # Only estimate after some progress to avoid wild initial estimates
+                if progress > 0.05:
+                    estimated_total = elapsed / progress
+                    remaining = estimated_total - elapsed
+
+                    # Round the seconds appropriately
+                    # Use ternary operator for time string format
+                    time_str = f"{remaining / 60:.1f}m" if remaining > 60 else f"{remaining:.1f}s"
+
+                    # Update progress with time info
+                    info = f"ETA: {time_str}"
+                    progress_bar.label = f"Decompressing ({info})"
+
+                # Update the progress bar position
+                progress_bar.update(current - progress_bar.pos)
+                last_update_time = current_time
+
+            # Handle completion
+            if progress >= 1.0 and progress_bar is not None:
+                total_time = time.time() - start_time
+                # Use ternary operator for completion time string
+                time_str = (
+                    f"{total_time / 60:.1f} minutes"
+                    if total_time >= 60
+                    else f"{total_time:.2f} seconds"
+                )
+                progress_bar.label = f"Decompressed in {time_str}"
+                progress_bar.finish()
+
+        # Start timer
+        start_time = time.time()
+
+        # Call restore with the progress callback
+        result = frostbyte.restore(path_spec, version, progress_callback)
 
         # Format file sizes for display
         def format_size(size_bytes: float) -> str:
@@ -118,12 +202,16 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
         original_size = result.get("original_size", 0)
         compressed_size = result.get("compressed_size", 0)
 
+        # Get execution time either from result or by calculating it
+        execution_time = result.get("execution_time", time.time() - start_time)
+
         click.echo(click.style(f"✓ Restored: {result['original_path']}", fg="green"))
         click.echo(f"  Version: {result['version']}")
         click.echo(f"  Timestamp: {result['timestamp']}")
         click.echo(f"  Original size: {format_size(original_size)}")
         click.echo(f"  Compressed size: {format_size(compressed_size)}")
         click.echo(f"  Compression ratio: {result.get('compression_ratio', 0):.1f}%")
+        click.echo(f"  Restore time: {execution_time:.2f} seconds")
     except Exception as e:
         click.echo(click.style(f"✗ Error: {e!s}", fg="red"))
         sys.exit(1)
