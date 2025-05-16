@@ -47,7 +47,14 @@ class Compressor:
 
             if file_ext == ".csv":
                 with open(source_path) as f:
-                    sample_lines = [next(f) for _ in range(10) if f]
+                    # Read up to 10 lines safely without StopIteration error
+                    sample_lines = []
+                    for _ in range(10):
+                        try:
+                            sample_lines.append(next(f))
+                        except StopIteration:
+                            break
+
                     if sample_lines:
                         avg_line_size = sum(len(line) for line in sample_lines) / len(sample_lines)
                         estimated_total_rows = max(100, int(file_size / avg_line_size))

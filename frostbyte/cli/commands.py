@@ -137,6 +137,7 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
     When using a partial name, if multiple files match, you'll be asked to be more specific.
     """
     try:
+
         def format_progress_size(size_bytes: float) -> str:
             if size_bytes >= 1024**3:
                 return f"{size_bytes / 1024**3:.2f} GB"
