@@ -88,20 +88,8 @@ def archive_cmd(path: str) -> None:
             update_needed = progress_increased and (enough_time_passed or enough_progress)
 
             if update_needed:
-                # Calculate and display estimated time remaining
-                elapsed = current_time - start_time
-                # Only estimate after some progress to avoid wild initial estimates
-                if progress > 0.05:
-                    estimated_total = elapsed / progress
-                    remaining = estimated_total - elapsed
-
-                    # Round the seconds appropriately
-                    # Use ternary operator for time string format
-                    time_str = f"{remaining / 60:.1f}m" if remaining > 60 else f"{remaining:.1f}s"
-
-                    # Update progress with time info
-                    info = f"ETA: {time_str}"
-                    progress_bar.label = f"Archiving ({info})"
+                # We're not showing ETA as requested
+                progress_bar.label = "Archiving"
 
                 # Update the progress bar position
                 progress_bar.update(current - progress_bar.pos)
@@ -220,20 +208,8 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
             update_needed = progress_increased and (enough_time_passed or enough_progress)
 
             if update_needed:
-                # Calculate and display estimated time remaining
-                elapsed = current_time - start_time
-                # Only estimate after some progress to avoid wild initial estimates
-                if progress > 0.05:
-                    estimated_total = elapsed / progress
-                    remaining = estimated_total - elapsed
-
-                    # Round the seconds appropriately
-                    # Use ternary operator for time string format
-                    time_str = f"{remaining / 60:.1f}m" if remaining > 60 else f"{remaining:.1f}s"
-
-                    # Update progress with time info
-                    info = f"ETA: {time_str}"
-                    progress_bar.label = f"Decompressing ({info})"
+                # We're not showing ETA as requested
+                progress_bar.label = "Decompressing"
 
                 # Update the progress bar position
                 progress_bar.update(current - progress_bar.pos)

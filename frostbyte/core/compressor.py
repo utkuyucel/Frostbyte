@@ -22,7 +22,10 @@ class Compressor:
         target_path: Optional[Union[str, Path]] = None,
         progress_callback: Optional[Callable[[float], None]] = None,
     ) -> Tuple[Path, int]:
+        # Track timing
+        start_time = time.time()
         source_path = Path(source_path)
+        logger.info(f"Starting compression of {source_path}")
 
         # If no target path is provided, use source path with .parquet extension
         if target_path is None:
@@ -42,34 +45,128 @@ class Compressor:
 
         # Read the source file based on its extension
         file_ext = source_path.suffix.lower()
+        file_size = source_path.stat().st_size
 
-        # Report progress at file reading stage
-        if progress_callback:
-            progress_callback(0.05)  # Started reading file
+        try:
+            # Report progress at file reading stage
+            if progress_callback:
+                progress_callback(0.05)  # Started reading file
+                
+            if file_ext == ".csv":
+                # For CSV files, use chunked reading for better progress tracking
+                # Estimate total rows for progress calculation
+                with open(source_path, 'r') as f:
+                    # Sample the first few lines to estimate row size
+                    sample_lines = [next(f) for _ in range(10) if f]
+                    if sample_lines:
+                        avg_line_size = sum(len(line) for line in sample_lines) / len(sample_lines)
+                        estimated_total_rows = max(100, int(file_size / avg_line_size))
+                    else:
+                        estimated_total_rows = 1000  # Default if file is empty
+                
+                # Determine optimal chunk size based on estimated rows
+                if estimated_total_rows < 1000:
+                    chunksize = estimated_total_rows  # Process all at once for small files
+                elif estimated_total_rows < 10000:
+                    chunksize = 1000  # ~10 updates
+                elif estimated_total_rows < 100000:
+                    chunksize = 5000  # ~20 updates
+                elif estimated_total_rows < 1000000:
+                    chunksize = 10000  # ~100 updates
+                else:
+                    chunksize = 50000  # For very large files
+                
+                # Read CSV in chunks with progress updates
+                chunks = []
+                total_rows_read = 0
+                last_progress_report = 0.05
+                
+                for i, chunk in enumerate(pd.read_csv(source_path, chunksize=chunksize)):
+                    chunks.append(chunk)
+                    total_rows_read += len(chunk)
+                    
+                    # Update progress - scale from 0.05 to 0.3
+                    if progress_callback and i % 2 == 0:  # Update every other chunk to avoid excessive callbacks
+                        # Estimate progress based on rows read vs estimated total
+                        raw_progress = min(total_rows_read / estimated_total_rows, 1.0)
+                        scaled_progress = 0.05 + (raw_progress * 0.25)  # Scale to 0.05-0.3 range
+                        
+                        # Only report if progress increased meaningfully
+                        if scaled_progress - last_progress_report >= 0.01:
+                            progress_callback(scaled_progress)
+                            last_progress_report = scaled_progress
+                
+                # Combine all chunks
+                df = pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
+                
+                if progress_callback:
+                    progress_callback(0.35)  # CSV reading complete
+                
+            elif file_ext in (".xls", ".xlsx", ".xlsm"):
+                # Excel files don't support chunked reading
+                # Report intermediate progress based on file size
+                # For large Excel files, provide intermediate progress updates
+                if progress_callback and file_size > 10_000_000:  # 10MB+
+                    progress_callback(0.1)  # Starting large Excel read
+                    progress_callback(0.2)  # Mid-way through Excel read
+                
+                df = pd.read_excel(source_path)
+                
+                if progress_callback:
+                    progress_callback(0.35)  # Excel reading complete
+                    
+            elif file_ext in (".parquet", ".pq"):
+                # For Parquet files, we can read metadata first for better progress tracking
+                parquet_file = pq.ParquetFile(source_path)
+                
+                if progress_callback:
+                    progress_callback(0.1)  # Metadata read
+                
+                # Read row group by row group for large files
+                if parquet_file.num_row_groups > 1:
+                    tables = []
+                    for i in range(parquet_file.num_row_groups):
+                        table = parquet_file.read_row_group(i)
+                        tables.append(table)
+                        
+                        # Update progress during reading (0.1 to 0.3)
+                        if progress_callback and parquet_file.num_row_groups > 0:
+                            progress = 0.1 + (0.2 * ((i + 1) / parquet_file.num_row_groups))
+                            progress_callback(progress)
+                    
+                    table = pa.concat_tables(tables)
+                    df = table.to_pandas()
+                else:
+                    # For single row group files
+                    df = pd.read_parquet(source_path)
+                
+                if progress_callback:
+                    progress_callback(0.35)  # Parquet reading complete
+            else:
+                raise ValueError(
+                    f"Unsupported format: {file_ext}. Supported formats: CSV, Excel, and Parquet."
+                )
 
-        if file_ext == ".csv":
-            df = pd.read_csv(source_path)
-        elif file_ext in (".xls", ".xlsx", ".xlsm"):
-            df = pd.read_excel(source_path)
-        elif file_ext in (".parquet", ".pq"):
-            df = pd.read_parquet(source_path)
-        else:
-            raise ValueError(
-                f"Unsupported format: {file_ext}. Supported formats: CSV, Excel, and Parquet."
-            )
+            # Report progress after file reading complete
+            if progress_callback:
+                progress_callback(0.4)  # File reading complete, starting compression
 
-        # Report progress after file reading complete
-        if progress_callback:
-            progress_callback(0.4)  # File reading complete, starting compression
+            # Write to Parquet format with compression
+            self._save_dataframe(df, target_path, progress_callback)
 
-        # Write to Parquet format with compression
-        self._save_dataframe(df, target_path, progress_callback)
-
-        # Final progress update
-        if progress_callback:
-            progress_callback(1.0)  # Compression complete
-
-        return target_path, target_path.stat().st_size
+            # Final progress update
+            if progress_callback:
+                progress_callback(1.0)  # Compression complete
+                
+            end_time = time.time()
+            execution_time = end_time - start_time
+            logger.info(f"Compression completed in {execution_time:.2f} seconds")
+            
+            return target_path, target_path.stat().st_size
+            
+        except Exception as e:
+            logger.error(f"Error during compression: {e}")
+            raise
 
     def read_parquet(self, source_path: Union[str, Path]) -> pd.DataFrame:
         source_path = Path(source_path)
@@ -84,15 +181,47 @@ class Compressor:
         # Convert DataFrame to Arrow Table
         if progress_callback:
             progress_callback(0.5)  # DataFrame conversion to Arrow Table
-
+        
+        # Get row count for tracking
+        row_count = len(df)
+            
+        # Convert to Arrow table
         table = pa.Table.from_pandas(df)
-
+        
         if progress_callback:
+            progress_callback(0.6)  # Arrow table conversion complete
             progress_callback(0.7)  # Starting Parquet write
-
-        pq.write_table(
-            table, target_path, compression=self.compression, row_group_size=self.row_group_size
-        )
+        
+        # PyArrow doesn't provide progress callbacks for write_table
+        # so we'll use a custom approach for larger datasets
+        if row_count > 10000 and self.row_group_size < row_count:
+            # For larger datasets, write by batch for better progress tracking
+            # Calculate number of row groups
+            num_row_groups = (row_count + self.row_group_size - 1) // self.row_group_size
+            
+            # Create Parquet writer
+            with pq.ParquetWriter(
+                target_path, table.schema, compression=self.compression
+            ) as writer:
+                # Process each batch
+                for i in range(num_row_groups):
+                    start_idx = i * self.row_group_size
+                    end_idx = min((i + 1) * self.row_group_size, row_count)
+                    
+                    # Extract slice of the table
+                    batch = table.slice(start_idx, end_idx - start_idx)
+                    writer.write_table(batch)
+                    
+                    # Report progress during batch writes (0.7 to 0.95 range)
+                    # Report on every batch for real-time progress
+                    if progress_callback:
+                        progress = 0.7 + (0.25 * ((i + 1) / num_row_groups))
+                        progress_callback(min(progress, 0.95))
+        else:
+            # For smaller datasets, just do a single write
+            pq.write_table(
+                table, target_path, compression=self.compression, row_group_size=self.row_group_size
+            )
 
         if progress_callback:
             progress_callback(0.95)  # Parquet write complete
@@ -307,10 +436,6 @@ class Compressor:
 
                     # Ensure we show completion
                     if progress_callback:
-                        # Final step - report at 0.98 to show we're finalizing
-                        progress_callback(0.98)
-                        # Add a tiny delay to ensure UI can reflect the progression visually
-                        time.sleep(0.1)
                         # Complete at 100%
                         progress_callback(1.0)
 
@@ -363,8 +488,8 @@ class Compressor:
                     # Write to Excel with progress estimation
                     # Unfortunately pandas doesn't provide progress for Excel writes
                     # so we'll simulate progress based on row count
-                    row_count = len(df)
-                    if row_count > 10000:
+                    df_row_count = len(df)
+                    if df_row_count > 10000:
                         # For large dataframes, to_excel can be slow
                         # Report incremental progress to keep UI responsive
                         if progress_callback:
