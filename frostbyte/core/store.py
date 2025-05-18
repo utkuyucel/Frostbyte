@@ -12,13 +12,14 @@ import duckdb
 
 from frostbyte.utils.json_utils import json_dumps
 
+
 class MetadataStore:
     def __init__(self, db_path: Union[str, Path]):
         self.db_path = Path(db_path)
         self._conn: Optional[duckdb.DuckDBPyConnection] = None
         if str(self.db_path) == ":memory:":
             # For in-memory databases, keep one persistent connection
-            self._conn = duckdb.connect() # type: ignore
+            self._conn = duckdb.connect()  # type: ignore
 
     def _connect(self) -> duckdb.DuckDBPyConnection:
         if self._conn:
@@ -27,7 +28,9 @@ class MetadataStore:
 
     def initialize(self) -> None:
         # Remove existing file if on disk
-        if self._conn is None and self.db_path.exists() and self.db_path.is_file(): # mypy check for self.db_path.is_file()
+        if (
+            self._conn is None and self.db_path.exists() and self.db_path.is_file()
+        ):  # mypy check for self.db_path.is_file()
             self.db_path.unlink()
         # Ensure parent dir exists
         if self._conn is None:
@@ -109,7 +112,9 @@ class MetadataStore:
                 ),
             )
             if schema and "columns" in schema:
-                for col_name, stats_data in schema["columns"].items(): # Renamed stats to stats_data
+                for col_name, stats_data in schema[
+                    "columns"
+                ].items():  # Renamed stats to stats_data
                     if "stats" in stats_data:
                         conn.execute(
                             """
@@ -172,7 +177,7 @@ class MetadataStore:
                 params_typed = (normalized_path, int(version))
             cursor = conn.execute(query, params_typed)
             result_tuple = cursor.fetchone()
-            if not result_tuple and "/" in normalized_path: # Check if path contains directory
+            if not result_tuple and "/" in normalized_path:  # Check if path contains directory
                 basename = Path(normalized_path).name
                 fallback_query: str
                 fb_params_typed: Union[tuple[str], tuple[str, int]]
@@ -206,12 +211,12 @@ class MetadataStore:
         try:
             query: str
             params: Optional[tuple[str]] = None
-            if file_name: # Detailed view for a specific file
+            if file_name:  # Detailed view for a specific file
                 # Resolve the file_name to its absolute path if it exists, otherwise use as is for partial matching
                 path_obj = Path(file_name)
                 if path_obj.exists():
                     resolved_file_name = str(path_obj.resolve())
-                else: # Allow partial name matching if full path doesn't exist
+                else:  # Allow partial name matching if full path doesn't exist
                     resolved_file_name = file_name
 
                 query = """
@@ -233,10 +238,12 @@ class MetadataStore:
                 WHERE a.original_path LIKE ? OR SPLIT_PART(a.original_path, '/', -1) LIKE ?
                 ORDER BY a.original_path, a.version
                 """
-                like_pattern = f"%{Path(resolved_file_name).name}%" # Match basename for flexibility
+                like_pattern = (
+                    f"%{Path(resolved_file_name).name}%"  # Match basename for flexibility
+                )
                 params = (like_pattern, like_pattern)
                 cursor = conn.execute(query, params)
-            else: # Summary view for all files
+            else:  # Summary view for all files
                 query = """
                 SELECT 
                     a.original_path,
@@ -265,14 +272,14 @@ class MetadataStore:
                 """
                 cursor = conn.execute(query)
 
-            rows = cursor.fetchall() # Fetch all rows
-            if not rows or not cursor.description: # Check if rows or description is empty
+            rows = cursor.fetchall()  # Fetch all rows
+            if not rows or not cursor.description:  # Check if rows or description is empty
                 return []
             # Ensure cols is not None before list comprehension
             cols = [d[0] for d in cursor.description if d[0] is not None]
             return [{cols[i]: row[i] for i in range(len(cols))} for row in rows]
         finally:
-            if self._conn is None: # Close connection if not persistent
+            if self._conn is None:  # Close connection if not persistent
                 conn.close()
 
     def get_stats(self, file_path: Optional[str] = None) -> Dict:
@@ -317,7 +324,7 @@ class MetadataStore:
                 cursor = conn.execute(query)
 
             row = cursor.fetchone() if cursor else None
-            if row and cursor.description: # Added check for cursor.description
+            if row and cursor.description:  # Added check for cursor.description
                 cols = [d[0] for d in cursor.description if d[0] is not None]
                 return dict(zip(cols, row))
             return {}
@@ -344,7 +351,7 @@ class MetadataStore:
             sel_query_str: str
             params_typed: Union[tuple[str], tuple[str, int]]
 
-            if version is not None: # Check for specific version first
+            if version is not None:  # Check for specific version first
                 sel_query_str = (
                     "SELECT id, storage_path FROM archives "
                     "WHERE original_path LIKE ? AND version = ?"
@@ -353,7 +360,7 @@ class MetadataStore:
             elif all_versions:
                 sel_query_str = "SELECT id, storage_path FROM archives WHERE original_path LIKE ?"
                 params_typed = (f"%{Path(file_path).name}%",)
-            else: # Latest version
+            else:  # Latest version
                 sel_query_str = """
                 SELECT id, storage_path FROM archives
                 WHERE original_path LIKE ?
@@ -368,27 +375,29 @@ class MetadataStore:
 
             # Delete stats
             if ids:
-                conn.execute(f"DELETE FROM stats WHERE archive_id IN ({','.join(['?']*len(ids))})", (*ids,))
+                conn.execute(
+                    f"DELETE FROM stats WHERE archive_id IN ({','.join(['?'] * len(ids))})", (*ids,)
+                )
                 conn.commit()
 
             # Delete archives
             delq_str: str
             delp_params: Union[tuple[str], tuple[str, int]]
 
-            if version is not None: # Check for specific version first
+            if version is not None:  # Check for specific version first
                 delq_str = "DELETE FROM archives WHERE original_path LIKE ? AND version = ?"
                 delp_params = (f"%{Path(file_path).name}%", version)
             elif all_versions:
                 delq_str = "DELETE FROM archives WHERE original_path LIKE ?"
                 delp_params = (f"%{Path(file_path).name}%",)
-            else: # Latest version
-                if ids: # Should be a single ID if not all_versions and version is None
+            else:  # Latest version
+                if ids:  # Should be a single ID if not all_versions and version is None
                     delq_str = "DELETE FROM archives WHERE id = ?"
-                    delp_params = (ids[0],) 
-                else: # No archive found to delete
+                    delp_params = (ids[0],)
+                else:  # No archive found to delete
                     return {"storage_paths": [], "count": 0}
 
-            if ids: # Only execute if there are archives to delete
+            if ids:  # Only execute if there are archives to delete
                 conn.execute(delq_str, delp_params)
                 conn.commit()
 
@@ -409,9 +418,9 @@ class MetadataStore:
             GROUP BY original_path
             ORDER BY original_path
             """
-            cursor = conn.execute(query, (basename,)) # Execute query with basename
-            results_tuples = cursor.fetchall() # Fetch all results
-            if not results_tuples: # If no results, try fallback 1
+            cursor = conn.execute(query, (basename,))  # Execute query with basename
+            results_tuples = cursor.fetchall()  # Fetch all results
+            if not results_tuples:  # If no results, try fallback 1
                 query_fallback1 = """
                 SELECT original_path, MAX(version) as latest_version
                 FROM archives
@@ -421,7 +430,7 @@ class MetadataStore:
                 """
                 cursor = conn.execute(query_fallback1, (name_part,))
                 results_tuples = cursor.fetchall()
-            if not results_tuples: # If no results, try fallback 2
+            if not results_tuples:  # If no results, try fallback 2
                 query_fallback2 = """
                 SELECT original_path, version as latest_version, storage_path
                 FROM archives
@@ -431,11 +440,13 @@ class MetadataStore:
                 cursor = conn.execute(query_fallback2, (name_part,))
                 results_tuples = cursor.fetchall()
 
-            if not results_tuples or not cursor.description: # Check if results or description is empty
+            if (
+                not results_tuples or not cursor.description
+            ):  # Check if results or description is empty
                 return []
             # Ensure cols is not None before list comprehension
             cols = [d[0] for d in cursor.description if d[0] is not None]
             return [{cols[i]: row[i] for i in range(len(cols))} for row in results_tuples]
         finally:
-            if self._conn is None: # Close connection if not persistent
+            if self._conn is None:  # Close connection if not persistent
                 conn.close()
