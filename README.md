@@ -46,8 +46,8 @@ fb archive dataset.csv
 # Later, after changes, archive again
 fb archive dataset.csv  # Creates version 2
 
-# List all versions
-fb ls --all
+# List all versions of a specific file
+fb ls dataset.csv
 
 # Restore a specific version
 fb restore dataset.csv -v 1
@@ -59,7 +59,7 @@ fb restore dataset.csv -v 1
 |---------|-------------|---------|
 | `fb init` | Setup Frostbyte in your project | `fb init` |
 | `fb archive <file>` | Compress and store a file | `fb archive data.csv` |
-| `fb ls` | List archived files | `fb ls` or `fb ls --all` |
+| `fb ls [file_name]` | List archived files. Optionally specify a file name to see all its versions. | `fb ls` or `fb ls my_data.csv` |
 | `fb stats [file]` | Show compression statistics | `fb stats` or `fb stats data.csv` |
 | `fb restore <file>` | Restore a file from archive | `fb restore data.csv` or `fb restore data.csv -v 2` |
 | `fb purge <file>` | Remove archive versions | `fb purge old_data.csv` |
