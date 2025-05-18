@@ -43,8 +43,8 @@ def restore(
     return get_manager().restore(path_spec, version, progress_callback)
 
 
-def ls(file_name: Optional[str] = None) -> List[Dict]: # Ensure this line is correct
-    return get_manager().list_archives(file_name=file_name) # Pass file_name correctly
+def ls(file_name: Optional[str] = None) -> List[Dict]:  # Ensure this line is correct
+    return get_manager().list_archives(file_name=file_name)  # Pass file_name correctly
 
 
 def stats(file_path: Optional[str] = None) -> Dict:

@@ -38,11 +38,23 @@ def test_cli_ls(cli_runner: CliRunner, sample_csv: str) -> None:
         with open(sample_path, "w") as f:
             f.write(sample_csv)
         cli_runner.invoke(cli, ["archive", str(sample_path)])
-        result = cli_runner.invoke(cli, ["ls"])
+        result = cli_runner.invoke(cli, ["ls"])  # Summary view
         assert result.exit_code == 0
         assert "sample.csv" in result.output
-        result_all = cli_runner.invoke(cli, ["ls", "--all"])
-        assert result_all.exit_code == 0
+        assert "Total Row Count" in result.output  # Check for summary header
+
+        # Archive again to have multiple versions for detailed view
+        with open(sample_path, "a") as f:
+            f.write("e,5\n")  # Add a new row
+        cli_runner.invoke(cli, ["archive", str(sample_path)])
+
+        result_detailed = cli_runner.invoke(cli, ["ls", str(sample_path)])  # Detailed view
+        assert result_detailed.exit_code == 0
+        assert "sample.csv" in result_detailed.output
+        assert "sample_v1.parquet" in result_detailed.output  # Check for archive filename v1
+        assert "sample_v2.parquet" in result_detailed.output  # Check for archive filename v2
+        assert "Row Count" in result_detailed.output  # Check for detailed view header
+        assert "Ver" in result_detailed.output  # Check for detailed view header (version)
 
 
 def test_cli_stats(cli_runner: CliRunner, sample_csv: str) -> None:

@@ -83,9 +83,9 @@ class TestProgressTracking:
         has_intermediate_values = any(0.2 < p < 0.8 for p in progress_values)
         has_multiple_steps = len({round(p, 1) for p in progress_values}) >= 4
 
-        assert (
-            has_intermediate_values or has_multiple_steps
-        ), "Progress should have intermediate steps"
+        assert has_intermediate_values or has_multiple_steps, (
+            "Progress should have intermediate steps"
+        )
 
     def test_progress_callback_excel(self, temp_test_files):
         """Test that progress callbacks are called with appropriate values for Excel files."""

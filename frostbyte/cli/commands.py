@@ -9,11 +9,13 @@ from tabulate import tabulate
 
 import frostbyte
 
+
 @click.group()
 @click.version_option(version=frostbyte.__version__)
 def cli() -> None:
     """Frostbyte: Cold Data Archiving for Pandas Workflows."""
     pass
+
 
 @cli.command("init")
 def init_cmd() -> None:
@@ -39,6 +41,7 @@ def init_cmd() -> None:
     except Exception as e:
         click.echo(click.style(f"✗ Error: {e!s}", fg="red"))
         sys.exit(1)
+
 
 @cli.command("archive")
 @click.argument("path", required=True, type=click.Path(exists=True))
@@ -118,6 +121,7 @@ def archive_cmd(path: str) -> None:
         click.echo(click.style(f"✗ Error: {e!s}", fg="red"))
         sys.exit(1)
 
+
 @cli.command("restore")
 @click.argument("path_spec", required=True)
 @click.option("--version", "-v", type=int, help="Specific version to restore")
@@ -147,13 +151,12 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
         progress_bar = None
         start_time = time.time()
         last_update_time = 0.0
-        # estimated_size = 0 # This variable was unused
 
         compressor_logger = logging.getLogger("frostbyte.compressor")
         compressor_logger.setLevel(logging.WARNING)
 
         def progress_callback(progress: float) -> None:
-            nonlocal progress_bar, start_time, last_update_time #, estimated_size # estimated_size removed
+            nonlocal progress_bar, start_time, last_update_time
             current_time = time.time()
 
             if progress_bar is None:
@@ -189,7 +192,7 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
                 progress_bar.label = f"Decompressed in {time_str}"
                 progress_bar.finish()
 
-        start_time_restore = time.time() # Renamed start_time to avoid conflict
+        start_time_restore = time.time()  # Renamed start_time to avoid conflict
 
         try:
             result = frostbyte.restore(path_spec, version, progress_callback)
@@ -222,6 +225,7 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
         click.echo(click.style(f"✗ Error: {e!s}", fg="red"))
         sys.exit(1)
 
+
 @cli.command("ls")
 @click.argument("file_name", required=False, type=str)
 def list_cmd(file_name: Optional[str]) -> None:
@@ -239,12 +243,12 @@ def list_cmd(file_name: Optional[str]) -> None:
                 click.echo(f"No archives found matching: {file_name}")
             return
 
-        if file_name: # Detailed view for a specific file
+        if file_name:  # Detailed view for a specific file
             table_data = []
             for result in results:
                 original_size_bytes = result.get("original_size_bytes", 0)
                 compressed_size_bytes = result.get("compressed_size_bytes", 0)
-                
+
                 original_size = original_size_bytes / 1024
                 compressed_size = compressed_size_bytes / 1024
                 size_unit = "KB"
@@ -253,11 +257,10 @@ def list_cmd(file_name: Optional[str]) -> None:
                     original_size /= 1024
                     compressed_size /= 1024
                     size_unit = "MB"
-                elif original_size > 1024 * 1024 :
-                    original_size /= (1024*1024)
-                    compressed_size /= (1024*1024)
+                elif original_size > 1024 * 1024:
+                    original_size /= 1024 * 1024
+                    compressed_size /= 1024 * 1024
                     size_unit = "GB"
-
 
                 table_data.append(
                     [
@@ -287,7 +290,7 @@ def list_cmd(file_name: Optional[str]) -> None:
                     tablefmt="simple",
                 )
             )
-        else: # Summary view for all files
+        else:  # Summary view for all files
             table_data = []
             for result in results:
                 total_size_bytes = result.get("total_size_bytes", 0)
@@ -301,17 +304,16 @@ def list_cmd(file_name: Optional[str]) -> None:
                     total_size /= 1024
                     total_compressed /= 1024
                     size_unit = "MB"
-                elif total_size > 1024*1024:
-                    total_size /= (1024*1024)
-                    total_compressed /= (1024*1024)
+                elif total_size > 1024 * 1024:
+                    total_size /= 1024 * 1024
+                    total_compressed /= 1024 * 1024
                     size_unit = "GB"
-
 
                 table_data.append(
                     [
                         result["original_path"],
                         result["latest_version"],
-                        result.get("total_row_count", "N/A"), # Changed from latest_row_count
+                        result.get("total_row_count", "N/A"),  # Changed from latest_row_count
                         result["version_count"],
                         result["last_modified"].strftime("%Y-%m-%d %H:%M:%S"),
                         f"{total_size:.2f} {size_unit}",
@@ -325,7 +327,7 @@ def list_cmd(file_name: Optional[str]) -> None:
                     headers=[
                         "Path",
                         "Latest Ver",
-                        "Total Row Count", # Changed header
+                        "Total Row Count",  # Changed header
                         "Total Vers",
                         "Last Modified",
                         "Total Size",
@@ -338,6 +340,7 @@ def list_cmd(file_name: Optional[str]) -> None:
     except Exception as e:
         click.echo(click.style(f"✗ Error: {e!s}", fg="red"))
         sys.exit(1)
+
 
 @cli.command("stats")
 @click.argument("file_path", required=False)
@@ -379,6 +382,7 @@ def stats_cmd(file_path: Optional[str] = None) -> None:
     except Exception as e:
         click.echo(click.style(f"✗ Error: {e!s}", fg="red"))
         sys.exit(1)
+
 
 @cli.command("purge")
 @click.argument("file_path", required=True)

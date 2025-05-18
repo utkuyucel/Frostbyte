@@ -291,13 +291,13 @@ class ArchiveManager:
             "original_size": original_size,
             "compressed_size": compressed_size,
             "compression_ratio": compression_ratio,
-            "row_count": archive_info.get("row_count"), # Add row_count here
+            "row_count": archive_info.get("row_count"),  # Add row_count here
             "execution_time": decompress_result.get("execution_time", 0.0),
         }
 
-    # The 'show_all' parameter is effectively replaced by 'file_name'
-    # If file_name is None, it's the summary view (old show_all=False)
-    # If file_name is provided, it's the detailed view for that file (old show_all=True, but filtered)
+    # list_archives behavior:
+    # - file_name is None: summary view (old show_all=False).
+    # - file_name is provided: detailed view for that file (old show_all=True, filtered).
     def list_archives(self, file_name: Optional[str] = None) -> List[Dict]:
         return self.store.list_archives(file_name=file_name)
 

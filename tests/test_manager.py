@@ -56,9 +56,13 @@ def test_archive_and_list(sample_csv: str) -> None:
     info2 = manager.archive(sample_csv)
     assert info2["version"] == 2
 
-    all_versions = manager.list_archives(show_all=True)
-    versions = sorted([entry["version"] for entry in all_versions])
+    # To get all versions for a specific file, pass its name
+    all_versions_for_file = manager.list_archives(file_name=sample_csv)
+    versions = sorted([entry["version"] for entry in all_versions_for_file])
     assert versions == [1, 2]
+    # Ensure the original_path is consistent and matches sample_csv's absolute path
+    abs_sample_csv_path = str(Path(sample_csv).resolve())
+    assert all(entry["original_path"] == abs_sample_csv_path for entry in all_versions_for_file)
 
 
 @pytest.mark.usefixtures("temp_workspace")
@@ -71,9 +75,31 @@ def test_purge_versions(sample_csv: str) -> None:
     # Purge version 1
     result1 = manager.purge(sample_csv, version=1)
     assert result1["count"] == 1
-    remaining = manager.list_archives(show_all=True)
-    assert all(entry["version"] != 1 for entry in remaining)
-    # Purge all
+    # After purging v1, listing versions for sample_csv should only show v2
+    remaining_versions_for_file = manager.list_archives(file_name=sample_csv)
+    if remaining_versions_for_file:  # It might be empty if only one version existed and was purged
+        assert len(remaining_versions_for_file) == 1
+        assert remaining_versions_for_file[0]["version"] == 2  # Assuming v2 was the other version
+    else:  # If only one version existed, it should be empty now
+        assert manager.list_archives(file_name=sample_csv) == []
+
+    # Purge all remaining versions of sample_csv
+    # At this point, only v2 of sample_csv should exist if it started with two versions.
+    # If it started with one, remaining_versions_for_file would be empty.
+    # The purge all should target the specific file.
     result_all = manager.purge(sample_csv, all_versions=True)
+
+    # Check that at least one version was purged (either v2, or v1 if it was the only one)
     assert result_all["count"] >= 1
-    assert manager.list_archives() == []
+
+    # After purging all versions of sample_csv, listing it should yield no results.
+    assert manager.list_archives(file_name=sample_csv) == []
+
+    # The general list (summary) might still contain other files if they existed.
+    # For this test, we only care that sample_csv is gone.
+    # If no other files were archived, manager.list_archives() would be [].
+    # If there were other files, they would still be listed.
+    # So, we check that sample_csv is not in the summary list.
+    summary_list = manager.list_archives()
+    abs_sample_csv_path = str(Path(sample_csv).resolve())
+    assert not any(item["original_path"] == abs_sample_csv_path for item in summary_list)

@@ -160,7 +160,8 @@ class MetadataStore:
         conn = self._connect()
         try:
             query: str
-            params_typed: Union[tuple[str], tuple[str, int]]
+            relation: duckdb.DuckDBPyRelation
+
             if version is None:
                 query = """
                 SELECT * FROM archives
@@ -168,19 +169,21 @@ class MetadataStore:
                 ORDER BY version DESC
                 LIMIT 1
                 """
-                params_typed = (normalized_path,)
+                current_params: tuple[str] = (normalized_path,)
+                relation = conn.execute(query, current_params)  # type: ignore[assignment]
             else:
                 query = """
                 SELECT * FROM archives
                 WHERE original_path = ? AND version = ?
                 """
-                params_typed = (normalized_path, int(version))
-            cursor = conn.execute(query, params_typed)
-            result_tuple = cursor.fetchone()
+                current_params_int: tuple[str, int] = (normalized_path, int(version))
+                relation = conn.execute(query, current_params_int)  # type: ignore[assignment]
+
+            result_tuple = relation.fetchone()
+
             if not result_tuple and "/" in normalized_path:  # Check if path contains directory
                 basename = Path(normalized_path).name
                 fallback_query: str
-                fb_params_typed: Union[tuple[str], tuple[str, int]]
                 if version is None:
                     fallback_query = """
                     SELECT * FROM archives
@@ -188,18 +191,19 @@ class MetadataStore:
                     ORDER BY version DESC
                     LIMIT 1
                     """
-                    fb_params_typed = (basename,)
+                    fb_current_params: tuple[str] = (basename,)
+                    relation = conn.execute(fallback_query, fb_current_params)  # type: ignore[assignment]
                 else:
                     fallback_query = """
                     SELECT * FROM archives
                     WHERE SPLIT_PART(original_path, '/', -1) = ? AND version = ?
                     """
-                    fb_params_typed = (basename, int(version))
-                cursor = conn.execute(fallback_query, fb_params_typed)
-                result_tuple = cursor.fetchone()
+                    fb_current_params_int: tuple[str, int] = (basename, int(version))
+                    relation = conn.execute(fallback_query, fb_current_params_int)  # type: ignore[assignment]
+                result_tuple = relation.fetchone()
 
-            if result_tuple and cursor.description:
-                cols = [d[0] for d in cursor.description]
+            if result_tuple and relation.description:
+                cols = [d[0] for d in relation.description]
                 return {cols[i]: result_tuple[i] for i in range(len(cols))}
             return None
         finally:
@@ -210,14 +214,11 @@ class MetadataStore:
         conn = self._connect()
         try:
             query: str
-            params: Optional[tuple[str]] = None
+            cursor: duckdb.DuckDBPyRelation
             if file_name:  # Detailed view for a specific file
-                # Resolve the file_name to its absolute path if it exists, otherwise use as is for partial matching
+                # Resolve to absolute path if exists, else use as is for partial matching.
                 path_obj = Path(file_name)
-                if path_obj.exists():
-                    resolved_file_name = str(path_obj.resolve())
-                else:  # Allow partial name matching if full path doesn't exist
-                    resolved_file_name = file_name
+                resolved_file_name = str(path_obj.resolve()) if path_obj.exists() else file_name
 
                 query = """
                 SELECT 
@@ -241,14 +242,14 @@ class MetadataStore:
                 like_pattern = (
                     f"%{Path(resolved_file_name).name}%"  # Match basename for flexibility
                 )
-                params = (like_pattern, like_pattern)
-                cursor = conn.execute(query, params)
+                current_params_list: tuple[str, str] = (like_pattern, like_pattern)
+                cursor = conn.execute(query, current_params_list)  # type: ignore[assignment]
             else:  # Summary view for all files
                 query = """
                 SELECT 
                     a.original_path,
                     MAX(a.version) AS latest_version,
-                    SUM(a.row_count) AS total_row_count, -- Sum of row_count for all versions of this path
+                    SUM(a.row_count) AS total_row_count, -- Sum row_count for all versions
                     COUNT(*) AS version_count,
                     MAX(a.timestamp) AS last_modified,
                     SUM(
@@ -270,7 +271,7 @@ class MetadataStore:
                 GROUP BY a.original_path
                 ORDER BY a.original_path
                 """
-                cursor = conn.execute(query)
+                cursor = conn.execute(query)  # type: ignore[assignment]
 
             rows = cursor.fetchall()  # Fetch all rows
             if not rows or not cursor.description:  # Check if rows or description is empty
@@ -287,7 +288,7 @@ class MetadataStore:
         conn = self._connect()
         try:
             query: str
-            params: Optional[tuple[str]] = None
+            cursor: duckdb.DuckDBPyRelation
             if file_path:
                 path = str(Path(file_path).resolve())
                 query = """
@@ -306,8 +307,8 @@ class MetadataStore:
                 WHERE a.original_path = ?
                 GROUP BY a.original_path
                 """
-                params = (path,)
-                cursor = conn.execute(query, params)
+                current_params_stats: tuple[str] = (path,)
+                cursor = conn.execute(query, current_params_stats)  # type: ignore[assignment]
             else:
                 query = """
                 SELECT 
@@ -321,7 +322,7 @@ class MetadataStore:
                     AVG(a.compression_ratio) AS avg_compression_ratio
                 FROM archives a
                 """
-                cursor = conn.execute(query)
+                cursor = conn.execute(query)  # type: ignore[assignment]
 
             row = cursor.fetchone() if cursor else None
             if row and cursor.description:  # Added check for cursor.description
@@ -418,7 +419,7 @@ class MetadataStore:
             GROUP BY original_path
             ORDER BY original_path
             """
-            cursor = conn.execute(query, (basename,))  # Execute query with basename
+            cursor = conn.execute(query, (basename,))  # type: ignore[assignment]
             results_tuples = cursor.fetchall()  # Fetch all results
             if not results_tuples:  # If no results, try fallback 1
                 query_fallback1 = """
@@ -428,7 +429,7 @@ class MetadataStore:
                 GROUP BY original_path
                 ORDER BY original_path
                 """
-                cursor = conn.execute(query_fallback1, (name_part,))
+                cursor = conn.execute(query_fallback1, (name_part,))  # type: ignore[assignment]
                 results_tuples = cursor.fetchall()
             if not results_tuples:  # If no results, try fallback 2
                 query_fallback2 = """
@@ -437,7 +438,7 @@ class MetadataStore:
                 WHERE CONTAINS(SPLIT_PART(storage_path, '/', -1), ?)
                 ORDER BY original_path
                 """
-                cursor = conn.execute(query_fallback2, (name_part,))
+                cursor = conn.execute(query_fallback2, (name_part,))  # type: ignore[assignment]
                 results_tuples = cursor.fetchall()
 
             if (
