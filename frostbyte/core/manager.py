@@ -115,6 +115,7 @@ class ArchiveManager:
             "original_size": original_size,
             "compressed_size": compressed_size,
             "compression_ratio": compression_ratio,
+            "row_count": row_count,
         }
 
     def restore(
@@ -290,11 +291,15 @@ class ArchiveManager:
             "original_size": original_size,
             "compressed_size": compressed_size,
             "compression_ratio": compression_ratio,
+            "row_count": archive_info.get("row_count"), # Add row_count here
             "execution_time": decompress_result.get("execution_time", 0.0),
         }
 
-    def list_archives(self, show_all: bool = False) -> List[Dict]:
-        return self.store.list_archives(show_all)
+    # The 'show_all' parameter is effectively replaced by 'file_name'
+    # If file_name is None, it's the summary view (old show_all=False)
+    # If file_name is provided, it's the detailed view for that file (old show_all=True, but filtered)
+    def list_archives(self, file_name: Optional[str] = None) -> List[Dict]:
+        return self.store.list_archives(file_name=file_name)
 
     def get_stats(self, file_path: Optional[str] = None) -> Dict:
         return self.store.get_stats(file_path)
