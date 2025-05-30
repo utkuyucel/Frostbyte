@@ -26,7 +26,7 @@ class Compressor:
                     sample_lines.append(next(f))
                 except StopIteration:
                     break
-            
+
         if sample_lines:
             avg_line_size = sum(len(line) for line in sample_lines) / len(sample_lines)
             estimated_total_rows = max(100, int(file_size / avg_line_size))
@@ -45,16 +45,14 @@ class Compressor:
         return estimated_total_rows, 50000
 
     def _process_csv_file(
-        self, 
-        source_path: Path, 
-        file_size: int, 
-        progress_callback: Optional[Callable[[float], None]] = None
+        self,
+        source_path: Path,
+        file_size: int,
+        progress_callback: Optional[Callable[[float], None]] = None,
     ) -> pd.DataFrame:
         """Process CSV file with progress tracking."""
-        estimated_total_rows, chunksize = self._estimate_rows_and_chunk_size(
-            source_path, file_size
-        )
-        
+        estimated_total_rows, chunksize = self._estimate_rows_and_chunk_size(source_path, file_size)
+
         chunks = []
         total_rows_read = 0
         last_progress_report = 0.05

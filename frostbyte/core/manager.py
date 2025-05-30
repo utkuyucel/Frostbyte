@@ -30,6 +30,7 @@ logger = logging.getLogger("frostbyte")
 @dataclass
 class ArchiveInfo:
     """Immutable data class for archive information."""
+
     archive_id: str
     original_path: str
     version: int
@@ -44,6 +45,7 @@ class ArchiveInfo:
 @dataclass
 class RestoreResult:
     """Immutable data class for restore operation results."""
+
     original_path: str
     version: int
     timestamp: datetime
@@ -345,8 +347,6 @@ class ArchiveManager:
         result = self.store.remove_archives(
             file_path, int(version) if version is not None else None, all_versions
         )
-
-        from contextlib import suppress
 
         for archive_path in result.get("storage_paths", []):
             with suppress(Exception):

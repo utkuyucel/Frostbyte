@@ -15,7 +15,7 @@ def format_table_row_detailed(result: dict) -> list:
     """Format a single row for detailed archive listing."""
     original_size, size_unit = FileSize(result.get("original_size_bytes", 0)).formatted
     compressed_size, _ = FileSize(result.get("compressed_size_bytes", 0)).formatted
-    
+
     return [
         result["original_path"],
         result["version"],
@@ -32,7 +32,7 @@ def format_table_row_summary(result: dict) -> list:
     """Format a single row for summary archive listing."""
     total_size, size_unit = FileSize(result.get("total_size_bytes", 0)).formatted
     total_compressed, _ = FileSize(result.get("total_compressed_bytes", 0)).formatted
-    
+
     return [
         result["original_path"],
         result["latest_version"],
@@ -135,8 +135,7 @@ def archive_cmd(path: str) -> None:
 
         original_size = result.get("original_size", 0)
         compressed_size = result.get("compressed_size", 0)
-        
-        # Use utility functions for size formatting
+
         original_size_val, original_unit = FileSize(original_size).formatted
         compressed_size_val, compressed_unit = FileSize(compressed_size).formatted
 
@@ -168,7 +167,6 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
     When using a partial name, if multiple files match, you'll be asked to be more specific.
     """
     try:
-
         progress_bar = None
         start_time = time.time()
         last_update_time = 0.0
@@ -224,8 +222,7 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
         original_size = result.get("original_size", 0)
         compressed_size = result.get("compressed_size", 0)
         execution_time = result.get("execution_time", time.time() - start_time_restore)
-        
-        # Use utility functions for size formatting
+
         original_size_val, original_unit = FileSize(original_size).formatted
         compressed_size_val, compressed_unit = FileSize(compressed_size).formatted
 
@@ -316,7 +313,6 @@ def stats_cmd(file_path: Optional[str] = None) -> None:
     try:
         stats_result = frostbyte.stats(file_path)
         if stats_result:
-            # Use utility functions for size formatting
             for key in stats_result:
                 if "size" in key.lower() and isinstance(stats_result[key], (int, float)):
                     size_value, size_unit = FileSize(stats_result[key]).formatted
