@@ -1,3 +1,4 @@
+import contextlib
 import hashlib
 import logging
 import time
@@ -15,6 +16,74 @@ class Compressor:
     def __init__(self, compression_level: str = "gzip", row_group_size: int = 100000):
         self.compression = compression_level
         self.row_group_size = row_group_size
+
+    def _estimate_rows_and_chunk_size(self, source_path: Path, file_size: int) -> Tuple[int, int]:
+        """Estimate total rows and determine optimal chunk size for CSV files."""
+        with open(source_path) as f:
+            sample_lines = []
+            for _ in range(10):
+                try:
+                    sample_lines.append(next(f))
+                except StopIteration:
+                    break
+            
+        if sample_lines:
+            avg_line_size = sum(len(line) for line in sample_lines) / len(sample_lines)
+            estimated_total_rows = max(100, int(file_size / avg_line_size))
+        else:
+            estimated_total_rows = 1000
+
+        # Determine chunk size based on estimated rows
+        if estimated_total_rows < 1000:
+            return estimated_total_rows, estimated_total_rows
+        if estimated_total_rows < 10000:
+            return estimated_total_rows, 1000
+        if estimated_total_rows < 100000:
+            return estimated_total_rows, 5000
+        if estimated_total_rows < 1000000:
+            return estimated_total_rows, 10000
+        return estimated_total_rows, 50000
+
+    def _process_csv_file(
+        self, 
+        source_path: Path, 
+        file_size: int, 
+        progress_callback: Optional[Callable[[float], None]] = None
+    ) -> pd.DataFrame:
+        """Process CSV file with progress tracking."""
+        estimated_total_rows, chunksize = self._estimate_rows_and_chunk_size(
+            source_path, file_size
+        )
+        
+        chunks = []
+        total_rows_read = 0
+        last_progress_report = 0.05
+
+        for i, chunk in enumerate(pd.read_csv(source_path, chunksize=chunksize)):
+            chunks.append(chunk)
+            total_rows_read += len(chunk)
+
+            if progress_callback and i % 2 == 0:
+                raw_progress = min(total_rows_read / estimated_total_rows, 1.0)
+                scaled_progress = 0.05 + (raw_progress * 0.25)
+
+                if scaled_progress - last_progress_report >= 0.01:
+                    progress_callback(scaled_progress)
+                    last_progress_report = scaled_progress
+
+        return pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
+
+    def _determine_batch_size(self, total_rows: int) -> int:
+        """Determine optimal batch size based on total rows."""
+        if total_rows < 1000:
+            return total_rows
+        if total_rows < 10000:
+            return 1000
+        if total_rows < 100000:
+            return 5000
+        if total_rows < 1000000:
+            return 10000
+        return 50000
 
     def compress(
         self,
@@ -46,50 +115,7 @@ class Compressor:
                 progress_callback(0.05)
 
             if file_ext == ".csv":
-                with open(source_path) as f:
-                    # Read up to 10 lines safely without StopIteration error
-                    sample_lines = []
-                    for _ in range(10):
-                        try:
-                            sample_lines.append(next(f))
-                        except StopIteration:
-                            break
-
-                    if sample_lines:
-                        avg_line_size = sum(len(line) for line in sample_lines) / len(sample_lines)
-                        estimated_total_rows = max(100, int(file_size / avg_line_size))
-                    else:
-                        estimated_total_rows = 1000
-
-                if estimated_total_rows < 1000:
-                    chunksize = estimated_total_rows
-                elif estimated_total_rows < 10000:
-                    chunksize = 1000
-                elif estimated_total_rows < 100000:
-                    chunksize = 5000
-                elif estimated_total_rows < 1000000:
-                    chunksize = 10000
-                else:
-                    chunksize = 50000
-
-                chunks = []
-                total_rows_read = 0
-                last_progress_report = 0.05
-
-                for i, chunk in enumerate(pd.read_csv(source_path, chunksize=chunksize)):
-                    chunks.append(chunk)
-                    total_rows_read += len(chunk)
-
-                    if progress_callback and i % 2 == 0:
-                        raw_progress = min(total_rows_read / estimated_total_rows, 1.0)
-                        scaled_progress = 0.05 + (raw_progress * 0.25)
-
-                        if scaled_progress - last_progress_report >= 0.01:
-                            progress_callback(scaled_progress)
-                            last_progress_report = scaled_progress
-
-                df = pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
-
+                df = self._process_csv_file(source_path, file_size, progress_callback)
                 if progress_callback:
                     progress_callback(0.35)
 
@@ -338,9 +364,12 @@ class Compressor:
                             rows_processed = len(df_first)
                             last_progress_report = 0.08
 
-                            batches = parquet_file.iter_batches(batch_size=batch_size)
+                            batch_iterator = parquet_file.iter_batches(batch_size=batch_size)
                             if len(df_first) > 0:
-                                next(batches, None)
+                                # Skip the first batch since we already processed it
+                                with contextlib.suppress(StopIteration):
+                                    next(batch_iterator)
+                            batches = list(batch_iterator)
 
                         for batch_idx, batch in enumerate(batches):
                             df_chunk = pa.Table.from_batches([batch]).to_pandas()

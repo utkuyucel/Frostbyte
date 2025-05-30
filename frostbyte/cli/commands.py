@@ -8,6 +8,41 @@ import click
 from tabulate import tabulate
 
 import frostbyte
+from frostbyte.utils.common import FileSize
+
+
+def format_table_row_detailed(result: dict) -> list:
+    """Format a single row for detailed archive listing."""
+    original_size, size_unit = FileSize(result.get("original_size_bytes", 0)).formatted
+    compressed_size, _ = FileSize(result.get("compressed_size_bytes", 0)).formatted
+    
+    return [
+        result["original_path"],
+        result["version"],
+        result["timestamp"].strftime("%Y-%m-%d %H:%M:%S"),
+        f"{original_size:.2f} {size_unit}",
+        f"{compressed_size:.2f} {size_unit}",
+        f"{result.get('compression_ratio', 0):.1f}%",
+        result.get("row_count", "N/A"),
+        result.get("archive_filename", "N/A"),
+    ]
+
+
+def format_table_row_summary(result: dict) -> list:
+    """Format a single row for summary archive listing."""
+    total_size, size_unit = FileSize(result.get("total_size_bytes", 0)).formatted
+    total_compressed, _ = FileSize(result.get("total_compressed_bytes", 0)).formatted
+    
+    return [
+        result["original_path"],
+        result["latest_version"],
+        result.get("total_row_count", "N/A"),
+        result["version_count"],
+        result["last_modified"].strftime("%Y-%m-%d %H:%M:%S"),
+        f"{total_size:.2f} {size_unit}",
+        f"{total_compressed:.2f} {size_unit}",
+        f"{result.get('avg_compression', 0):.1f}%",
+    ]
 
 
 @click.group()
@@ -98,23 +133,18 @@ def archive_cmd(path: str) -> None:
             compressor_logger = logging.getLogger("frostbyte.compressor")
             compressor_logger.setLevel(logging.INFO)
 
-        def format_size(size_bytes: float) -> str:
-            if size_bytes >= 1024 * 1024 * 1024:
-                return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
-            if size_bytes >= 1024 * 1024:
-                return f"{size_bytes / (1024 * 1024):.2f} MB"
-            if size_bytes >= 1024:
-                return f"{size_bytes / 1024:.2f} KB"
-            return f"{round(size_bytes)} bytes"
-
         original_size = result.get("original_size", 0)
         compressed_size = result.get("compressed_size", 0)
+        
+        # Use utility functions for size formatting
+        original_size_val, original_unit = FileSize(original_size).formatted
+        compressed_size_val, compressed_unit = FileSize(compressed_size).formatted
 
         click.echo(click.style(f"\n✓ Archived: {result['original_path']}", fg="green"))
         click.echo(f"  Version: {result['version']}")
         click.echo(f"  Archive: {result['archive_name']}")
-        click.echo(f"  Original size: {format_size(original_size)}")
-        click.echo(f"  Compressed size: {format_size(compressed_size)}")
+        click.echo(f"  Original size: {original_size_val:.2f} {original_unit}")
+        click.echo(f"  Compressed size: {compressed_size_val:.2f} {compressed_unit}")
         click.echo(f"  Row count: {result.get('row_count', 'N/A')}")
         click.echo(f"  Compression ratio: {result['compression_ratio']:.2f}%")
     except Exception as e:
@@ -138,15 +168,6 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
     When using a partial name, if multiple files match, you'll be asked to be more specific.
     """
     try:
-
-        def format_progress_size(size_bytes: float) -> str:
-            if size_bytes >= 1024**3:
-                return f"{size_bytes / 1024**3:.2f} GB"
-            if size_bytes >= 1024**2:
-                return f"{size_bytes / 1024**2:.2f} MB"
-            if size_bytes >= 1024:
-                return f"{size_bytes / 1024:.2f} KB"
-            return f"{size_bytes} bytes"
 
         progress_bar = None
         start_time = time.time()
@@ -200,24 +221,19 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
             compressor_logger = logging.getLogger("frostbyte.compressor")
             compressor_logger.setLevel(logging.INFO)
 
-        def format_size(size_bytes: float) -> str:
-            if size_bytes >= 1024 * 1024 * 1024:
-                return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
-            if size_bytes >= 1024 * 1024:
-                return f"{size_bytes / (1024 * 1024):.2f} MB"
-            if size_bytes >= 1024:
-                return f"{size_bytes / 1024:.2f} KB"
-            return f"{round(size_bytes)} bytes"
-
         original_size = result.get("original_size", 0)
         compressed_size = result.get("compressed_size", 0)
         execution_time = result.get("execution_time", time.time() - start_time_restore)
+        
+        # Use utility functions for size formatting
+        original_size_val, original_unit = FileSize(original_size).formatted
+        compressed_size_val, compressed_unit = FileSize(compressed_size).formatted
 
         click.echo(click.style(f"\n✓ Restored: {result['original_path']}", fg="green"))
         click.echo(f"  Version: {result['version']}")
         click.echo(f"  Timestamp: {result['timestamp']}")
-        click.echo(f"  Original size: {format_size(original_size)}")
-        click.echo(f"  Compressed size: {format_size(compressed_size)}")
+        click.echo(f"  Original size: {original_size_val:.2f} {original_unit}")
+        click.echo(f"  Compressed size: {compressed_size_val:.2f} {compressed_unit}")
         click.echo(f"  Row count: {result.get('row_count', 'N/A')}")
         click.echo(f"  Compression ratio: {result.get('compression_ratio', 0):.1f}%")
         click.echo(f"  Restore time: {execution_time:.2f} seconds")
@@ -246,34 +262,8 @@ def list_cmd(file_name: Optional[str]) -> None:
         if file_name:  # Detailed view for a specific file
             table_data = []
             for result in results:
-                original_size_bytes = result.get("original_size_bytes", 0)
-                compressed_size_bytes = result.get("compressed_size_bytes", 0)
-
-                original_size = original_size_bytes / 1024
-                compressed_size = compressed_size_bytes / 1024
-                size_unit = "KB"
-
-                if original_size > 1024:
-                    original_size /= 1024
-                    compressed_size /= 1024
-                    size_unit = "MB"
-                elif original_size > 1024 * 1024:
-                    original_size /= 1024 * 1024
-                    compressed_size /= 1024 * 1024
-                    size_unit = "GB"
-
-                table_data.append(
-                    [
-                        result["original_path"],
-                        result["version"],
-                        result["timestamp"].strftime("%Y-%m-%d %H:%M:%S"),
-                        f"{original_size:.2f} {size_unit}",
-                        f"{compressed_size:.2f} {size_unit}",
-                        f"{result.get('compression_ratio', 0):.1f}%",
-                        result.get("row_count", "N/A"),
-                        result.get("archive_filename", "N/A"),
-                    ]
-                )
+                # Use helper function for formatting table rows
+                table_data.append(format_table_row_detailed(result))
             click.echo(
                 tabulate(
                     table_data,
@@ -293,34 +283,8 @@ def list_cmd(file_name: Optional[str]) -> None:
         else:  # Summary view for all files
             table_data = []
             for result in results:
-                total_size_bytes = result.get("total_size_bytes", 0)
-                total_compressed_bytes = result.get("total_compressed_bytes", 0)
-
-                total_size = total_size_bytes / 1024
-                total_compressed = total_compressed_bytes / 1024
-                size_unit = "KB"
-
-                if total_size > 1024:
-                    total_size /= 1024
-                    total_compressed /= 1024
-                    size_unit = "MB"
-                elif total_size > 1024 * 1024:
-                    total_size /= 1024 * 1024
-                    total_compressed /= 1024 * 1024
-                    size_unit = "GB"
-
-                table_data.append(
-                    [
-                        result["original_path"],
-                        result["latest_version"],
-                        result.get("total_row_count", "N/A"),  # Changed from latest_row_count
-                        result["version_count"],
-                        result["last_modified"].strftime("%Y-%m-%d %H:%M:%S"),
-                        f"{total_size:.2f} {size_unit}",
-                        f"{total_compressed:.2f} {size_unit}",
-                        f"{result.get('avg_compression', 0):.1f}%",
-                    ]
-                )
+                # Use helper function for formatting table rows
+                table_data.append(format_table_row_summary(result))
             click.echo(
                 tabulate(
                     table_data,
@@ -352,18 +316,13 @@ def stats_cmd(file_path: Optional[str] = None) -> None:
     try:
         stats_result = frostbyte.stats(file_path)
         if stats_result:
+            # Use utility functions for size formatting
             for key in stats_result:
                 if "size" in key.lower() and isinstance(stats_result[key], (int, float)):
-                    size_bytes = stats_result[key]
-                    if size_bytes > 1024 * 1024 * 1024:
-                        stats_result[key] = f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
-                    elif size_bytes > 1024 * 1024:
-                        stats_result[key] = f"{size_bytes / (1024 * 1024):.2f} MB"
-                    elif size_bytes > 1024:
-                        stats_result[key] = f"{size_bytes / 1024:.2f} KB"
-                    else:
-                        stats_result[key] = f"{size_bytes:.0f} bytes"
+                    size_value, size_unit = FileSize(stats_result[key]).formatted
+                    stats_result[key] = f"{size_value:.2f} {size_unit}"
 
+            # Rename keys for better display
             if "total_size_saved" in stats_result:
                 stats_result["Total Size Saved"] = stats_result.pop("total_size_saved")
             if "total_archives" in stats_result:

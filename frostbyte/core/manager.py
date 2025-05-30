@@ -8,6 +8,8 @@ import logging
 import os
 import time
 import uuid
+from contextlib import suppress
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Union
@@ -23,6 +25,33 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()],
 )
 logger = logging.getLogger("frostbyte")
+
+
+@dataclass
+class ArchiveInfo:
+    """Immutable data class for archive information."""
+    archive_id: str
+    original_path: str
+    version: int
+    storage_path: str
+    timestamp: datetime
+    hash: str
+    row_count: int
+    compression_ratio: float
+    original_extension: str
+
+
+@dataclass
+class RestoreResult:
+    """Immutable data class for restore operation results."""
+    original_path: str
+    version: int
+    timestamp: datetime
+    original_size: int
+    compressed_size: int
+    compression_ratio: float
+    row_count: Optional[int]
+    execution_time: float
 
 
 class ArchiveManager:

@@ -1,9 +1,12 @@
 import hashlib
+from functools import lru_cache
 from pathlib import Path
 from typing import Union
 
 
+@lru_cache(maxsize=256)
 def get_file_hash(file_path: Union[str, Path]) -> str:
+    """Compute SHA256 hash of file with caching for performance."""
     file_path = Path(file_path)
     sha256 = hashlib.sha256()
 
@@ -15,5 +18,5 @@ def get_file_hash(file_path: Union[str, Path]) -> str:
 
 
 def get_file_size(file_path: Union[str, Path]) -> int:
-    file_path = Path(file_path)
-    return file_path.stat().st_size
+    """Get file size in bytes."""
+    return Path(file_path).stat().st_size
