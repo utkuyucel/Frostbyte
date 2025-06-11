@@ -82,13 +82,14 @@ class ArchiveManager:
 
             return True
         except Exception as e:
-            print(f"Error initializing Frostbyte: {e}")
+            logger.error(f"Error initializing Frostbyte: {e}")
             return False
 
     def archive(
         self,
         file_path: str,
         quiet: bool = False,
+        verify: bool = True,
         progress_callback: Optional[Callable[[float], None]] = None,
     ) -> Dict:
         file_path_obj = Path(file_path).resolve()
@@ -124,6 +125,48 @@ class ArchiveManager:
         )
 
         archive_id = str(uuid.uuid4())
+        original_extension = file_path_obj.suffix
+
+        # Verify archive integrity immediately after compression
+        if verify:
+            if not quiet:
+                logger.info("Verifying archive integrity...")
+
+            try:
+                # Test decompression to temporary location to verify integrity
+                import tempfile
+
+                with tempfile.NamedTemporaryFile(
+                    suffix=original_extension, delete=False
+                ) as temp_file:
+                    temp_path = Path(temp_file.name)
+
+                try:
+                    self.compressor.decompress(archive_path, temp_path, original_extension)
+
+                    # Verify hash matches
+                    restored_hash = get_file_hash(temp_path)
+
+                    if file_hash != restored_hash:
+                        # Clean up and raise error
+                        temp_path.unlink(missing_ok=True)
+                        archive_path.unlink(missing_ok=True)
+                        raise ValueError(
+                            "Archive verification failed! "
+                            "Original and restored file hashes don't match. "
+                            "This indicates a compression/decompression error."
+                        )
+
+                    if not quiet:
+                        logger.info("Archive integrity verified")
+
+                finally:
+                    temp_path.unlink(missing_ok=True)
+
+            except Exception as e:
+                # Clean up archive file if verification fails
+                archive_path.unlink(missing_ok=True)
+                raise ValueError(f"Archive verification failed: {e!s}") from e
         original_extension = file_path_obj.suffix
         self.store.add_archive(
             id=archive_id,
@@ -268,6 +311,40 @@ class ArchiveManager:
             )
             # Store execution time in the result
             decompress_result["execution_time"] = time.time() - start_time
+
+            # Add line break and inform user about data integrity check
+            print()
+            logger.info("Decompression complete. Starting data integrity validation...")
+
+            # Automatic hash validation after successful decompression
+            stored_hash = archive_info.get("hash")
+            if stored_hash:
+                # For CSV files, validate data content rather than raw bytes
+                # to account for formatting differences during pandas processing
+                original_extension = archive_info.get("original_extension", "")
+
+                if original_extension.lower() == ".csv":
+                    # Validate data content for CSV files
+                    validation_passed = self._validate_csv_data_content(original_path, archive_info)
+                else:
+                    # For other files, use hash validation
+                    from frostbyte.utils.file_utils import get_file_hash
+
+                    current_hash = get_file_hash(original_path)
+                    validation_passed = stored_hash == current_hash
+
+                if not validation_passed:
+                    # Clean up the restored file since validation failed
+                    original_path.unlink(missing_ok=True)
+                    raise ValueError(
+                        "Data validation failed during restore!\n"
+                        "This indicates data corruption. Archive may be damaged."
+                    )
+
+                logger.info(f"Data validation passed for {original_path.name}")
+            else:
+                logger.warning(f"No stored hash available for validation of {original_path.name}")
+
         except ValueError as e:
             if "Invalid Parquet file" in str(e) or "Parquet magic bytes" in str(e):
                 # This likely means the file wasn't properly converted to parquet format
@@ -365,3 +442,34 @@ class ArchiveManager:
     def find_by_name(self, name_part: str) -> List[Dict]:
         """Find archives by partial filename match."""
         return self.store.find_archives_by_name(name_part)
+
+    def _validate_csv_data_content(self, restored_path: Path, archive_info: Dict) -> bool:
+        """Validate CSV data content by comparing row count and data structure."""
+        try:
+            import pandas as pd
+
+            # Read the restored CSV
+            restored_df = pd.read_csv(restored_path)
+
+            # Get expected row count from archive metadata
+            expected_row_count = archive_info.get("row_count", 0)
+            actual_row_count = len(restored_df)
+
+            # Basic validation: check if row counts match
+            if expected_row_count != actual_row_count:
+                logger.warning(
+                    f"Row count mismatch: expected {expected_row_count}, got {actual_row_count}"
+                )
+                return False
+
+            # Additional validation: check if dataframe is not empty and has expected structure
+            if restored_df.empty and expected_row_count > 0:
+                logger.warning("Restored CSV is empty but expected data")
+                return False
+
+            # If we reach here, basic validation passed
+            return True
+
+        except Exception as e:
+            logger.warning(f"CSV validation failed: {e!s}")
+            return False

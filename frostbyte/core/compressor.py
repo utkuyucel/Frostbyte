@@ -1,4 +1,3 @@
-import contextlib
 import hashlib
 import logging
 import time
@@ -350,9 +349,9 @@ class Compressor:
                             batches = []
                             last_progress_report = 0.95
                         else:
-                            first_batch = next(
-                                parquet_file.iter_batches(batch_size=min(1, total_rows))
-                            )
+                            # Process in batches, starting with header
+                            batch_iterator = parquet_file.iter_batches(batch_size=batch_size)
+                            first_batch = next(batch_iterator)
                             df_first = pa.Table.from_batches([first_batch]).to_pandas()
                             df_first.to_csv(csv_file, index=False, header=True, mode="w")
 
@@ -362,11 +361,7 @@ class Compressor:
                             rows_processed = len(df_first)
                             last_progress_report = 0.08
 
-                            batch_iterator = parquet_file.iter_batches(batch_size=batch_size)
-                            if len(df_first) > 0:
-                                # Skip the first batch since we already processed it
-                                with contextlib.suppress(StopIteration):
-                                    next(batch_iterator)
+                            # Get remaining batches from the same iterator
                             batches = list(batch_iterator)
 
                         for batch_idx, batch in enumerate(batches):

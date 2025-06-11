@@ -58,7 +58,7 @@ def init_cmd() -> None:
     try:
         if Path(".frostbyte").exists() and not click.confirm(
             click.style(
-                "⚠️  WARNING: Reset existing Frostbyte database?",
+                "WARNING: Reset existing Frostbyte database?",
                 fg="yellow",
             ),
             default=False,
@@ -68,13 +68,13 @@ def init_cmd() -> None:
 
         result = frostbyte.init()
         if result:
-            click.echo(click.style("✓ Frostbyte initialized successfully", fg="green"))
+            click.echo(click.style("SUCCESS: Frostbyte initialized successfully", fg="green"))
             click.echo(click.style("  Database reset to empty state", fg="blue"))
         else:
-            click.echo(click.style("✗ Failed to initialize Frostbyte", fg="red"))
+            click.echo(click.style("FAILED: Failed to initialize Frostbyte", fg="red"))
             sys.exit(1)
     except Exception as e:
-        click.echo(click.style(f"✗ Error: {e!s}", fg="red"))
+        click.echo(click.style(f"ERROR: {e!s}", fg="red"))
         sys.exit(1)
 
 
@@ -98,8 +98,8 @@ def archive_cmd(path: str) -> None:
                 progress_bar = click.progressbar(
                     length=100,
                     label="Archiving",
-                    fill_char="█",
-                    empty_char="░",
+                    fill_char="#",
+                    empty_char="-",
                     show_pos=True,
                     show_percent=True,
                     bar_template="%(label)s [%(bar)s] %(info)s",
@@ -128,7 +128,9 @@ def archive_cmd(path: str) -> None:
                 progress_bar.finish()
 
         try:
-            result = frostbyte.archive(path, quiet=True, progress_callback=progress_callback)
+            result = frostbyte.archive(
+                path, quiet=True, verify=False, progress_callback=progress_callback
+            )
         finally:
             compressor_logger = logging.getLogger("frostbyte.compressor")
             compressor_logger.setLevel(logging.INFO)
@@ -139,7 +141,7 @@ def archive_cmd(path: str) -> None:
         original_size_val, original_unit = FileSize(original_size).formatted
         compressed_size_val, compressed_unit = FileSize(compressed_size).formatted
 
-        click.echo(click.style(f"\n✓ Archived: {result['original_path']}", fg="green"))
+        click.echo(click.style(f"\nSUCCESS: Archived: {result['original_path']}", fg="green"))
         click.echo(f"  Version: {result['version']}")
         click.echo(f"  Archive: {result['archive_name']}")
         click.echo(f"  Original size: {original_size_val:.2f} {original_unit}")
@@ -147,7 +149,7 @@ def archive_cmd(path: str) -> None:
         click.echo(f"  Row count: {result.get('row_count', 'N/A')}")
         click.echo(f"  Compression ratio: {result['compression_ratio']:.2f}%")
     except Exception as e:
-        click.echo(click.style(f"✗ Error: {e!s}", fg="red"))
+        click.echo(click.style(f"ERROR: {e!s}", fg="red"))
         sys.exit(1)
 
 
@@ -182,8 +184,8 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
                 progress_bar = click.progressbar(
                     length=100,
                     label="Decompressing",
-                    fill_char="█",
-                    empty_char="░",
+                    fill_char="#",
+                    empty_char="-",
                     show_pos=True,
                     show_percent=True,
                     bar_template="%(label)s [%(bar)s] %(info)s",
@@ -226,7 +228,7 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
         original_size_val, original_unit = FileSize(original_size).formatted
         compressed_size_val, compressed_unit = FileSize(compressed_size).formatted
 
-        click.echo(click.style(f"\n✓ Restored: {result['original_path']}", fg="green"))
+        click.echo(click.style(f"\nSUCCESS: Restored: {result['original_path']}", fg="green"))
         click.echo(f"  Version: {result['version']}")
         click.echo(f"  Timestamp: {result['timestamp']}")
         click.echo(f"  Original size: {original_size_val:.2f} {original_unit}")
@@ -235,7 +237,7 @@ def restore_cmd(path_spec: str, version: Optional[int] = None) -> None:
         click.echo(f"  Compression ratio: {result.get('compression_ratio', 0):.1f}%")
         click.echo(f"  Restore time: {execution_time:.2f} seconds")
     except Exception as e:
-        click.echo(click.style(f"✗ Error: {e!s}", fg="red"))
+        click.echo(click.style(f"ERROR: {e!s}", fg="red"))
         sys.exit(1)
 
 
@@ -299,7 +301,7 @@ def list_cmd(file_name: Optional[str]) -> None:
                 )
             )
     except Exception as e:
-        click.echo(click.style(f"✗ Error: {e!s}", fg="red"))
+        click.echo(click.style(f"ERROR: {e!s}", fg="red"))
         sys.exit(1)
 
 
@@ -330,12 +332,12 @@ def stats_cmd(file_path: Optional[str] = None) -> None:
             if "size_saved" in stats_result:
                 stats_result["Size Saved"] = stats_result.pop("size_saved")
 
-            click.echo(click.style("✓ Archive Statistics:", fg="green"))
+            click.echo(click.style("Archive Statistics:", fg="green"))
             click.echo(tabulate([stats_result], headers="keys"))
         else:
             click.echo("No archives found.")
     except Exception as e:
-        click.echo(click.style(f"✗ Error: {e!s}", fg="red"))
+        click.echo(click.style(f"ERROR: {e!s}", fg="red"))
         sys.exit(1)
 
 
@@ -353,8 +355,8 @@ def purge_cmd(file_path: str, version: Optional[int] = None, all_versions: bool 
         else:
             message = f"Removed version {result['version']} of {result['original_path']}"
 
-        click.echo(click.style(f"✓ {message}", fg="green"))
+        click.echo(click.style(f"SUCCESS: {message}", fg="green"))
         click.echo(f"  Removed {result['count']} archive(s)")
     except Exception as e:
-        click.echo(click.style(f"✗ Error: {e!s}", fg="red"))
+        click.echo(click.style(f"ERROR: {e!s}", fg="red"))
         sys.exit(1)

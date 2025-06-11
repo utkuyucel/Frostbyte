@@ -39,7 +39,10 @@ class Config:
                         else:
                             self.config[section] = values
             except Exception as e:
-                print(f"Warning: Failed to load config from {self.config_path}: {e}")
+                import logging
+
+                logger = logging.getLogger("frostbyte.config")
+                logger.warning(f"Failed to load config from {self.config_path}: {e}")
 
     def save(self) -> None:
         self.config_path.parent.mkdir(exist_ok=True)

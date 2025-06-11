@@ -1,8 +1,12 @@
-from typing import Optional
+import sys
+from typing import TYPE_CHECKING, List, Optional
 
 import click
 
 from frostbyte.core.manager import ArchiveManager
+
+if TYPE_CHECKING:
+    from frostbyte.core.validation import ArchiveValidator
 
 
 @click.group()
@@ -50,7 +54,16 @@ def restore(path: str, version: Optional[int] = None) -> None:
 def ls(all: bool) -> None:
     """List archived files, optionally showing all versions."""
     manager = ArchiveManager()
-    results = manager.list_archives(all)
+    if all:
+        # Show all versions - pass None to get all files, then get detailed view
+        all_files = manager.list_archives()
+        results = []
+        for file_summary in all_files:
+            file_path = file_summary["original_path"]
+            file_results = manager.list_archives(file_name=file_path)
+            results.extend(file_results)
+    else:
+        results = manager.list_archives()
 
     if not results:
         click.echo("No archives found.")
@@ -171,3 +184,168 @@ def purge(file: str, version: Optional[int] = None, all: bool = False) -> None:
         click.echo(f"Removed all versions of {result['original_path']}")
     else:
         click.echo(f"Removed version {result['version']} of {result['original_path']}")
+
+
+@cli.command()
+@click.argument("file_path", required=False)
+@click.option("--version", "-v", type=int, help="Specific version to verify")
+@click.option(
+    "--level",
+    type=click.Choice(["fast", "medium", "thorough", "full"]),
+    default="medium",
+    help="Validation thoroughness level",
+)
+@click.option(
+    "--sample-rate", type=float, default=0.1, help="Sampling rate for row validation (0.0-1.0)"
+)
+def verify(
+    file_path: Optional[str], version: Optional[int], level: str, sample_rate: float
+) -> None:
+    """Verify archive integrity and detect corruption."""
+    from frostbyte.core.validation import ArchiveValidator
+
+    manager = ArchiveManager()
+    validator = ArchiveValidator(manager.store, manager.archives_dir)
+
+    # Define validation levels
+    validation_map = {
+        "fast": ["hash"],
+        "medium": ["hash"],
+        "thorough": ["hash", "rows"],
+        "full": ["hash", "rows"],
+    }
+
+    if file_path:
+        # Validate specific file
+        _validate_single_file(validator, file_path, version, validation_map[level], sample_rate)
+    else:
+        # Validate all archives
+        _validate_all_archives(validator, validation_map[level], sample_rate)
+
+
+def _validate_single_file(
+    validator: "ArchiveValidator",
+    file_path: str,
+    version: Optional[int],
+    checks: List[str],
+    sample_rate: float,
+) -> None:
+    """Validate a single file with specified checks."""
+    click.echo(f"Validating {file_path}" + (f" (v{version})" if version else ""))
+    click.echo()
+
+    all_valid = True
+    total_errors = 0
+    total_warnings = 0
+
+    for check in checks:
+        click.echo(f"Running {check} validation...", nl=False)
+
+        try:
+            if check == "hash":
+                result = validator.validate_content_hash(file_path, version)
+            elif check == "rows":
+                result = validator.validate_row_integrity(file_path, version, sample_rate)
+            else:
+                continue
+
+            # Display results
+            status = "[PASS]" if result.is_valid else "[FAIL]"
+            click.echo(f" {status}")
+
+            if result.errors:
+                for error in result.errors:
+                    click.echo(f"    ERROR: {error}", err=True)
+                total_errors += len(result.errors)
+
+            if result.warnings:
+                for warning in result.warnings:
+                    click.echo(f"    WARNING: {warning}")
+                total_warnings += len(result.warnings)
+
+            # Show useful details for hash validation
+            if check == "hash" and result.details and result.details.get("hashes_match"):
+                click.echo("    VERIFIED: Content hash verified")
+
+            all_valid = all_valid and result.is_valid
+
+        except Exception as e:
+            click.echo(" [FAIL]")
+            click.echo(f"    ERROR: Validation failed: {e!s}", err=True)
+            all_valid = False
+            total_errors += 1
+
+    click.echo()
+
+    if all_valid:
+        click.echo(click.style("SUCCESS: All validations passed", fg="green"))
+        click.echo(f"Archive integrity confirmed for {file_path}")
+    else:
+        click.echo(click.style("FAILED: Validation failed", fg="red"))
+        click.echo(f"Found {total_errors} error(s) and {total_warnings} warning(s)")
+        sys.exit(1)
+
+
+def _validate_all_archives(
+    validator: "ArchiveValidator", checks: List[str], sample_rate: float
+) -> None:
+    """Validate all archives with specified checks."""
+    click.echo("Validating all archives...")
+    click.echo()
+
+    try:
+        all_results = validator.validate_all_archives(checks, sample_rate)
+    except Exception as e:
+        click.echo(f"ERROR: Failed to validate archives: {e!s}", err=True)
+        sys.exit(1)
+
+    if not all_results:
+        click.echo("No archives found to validate.")
+        return
+
+    total_files = 0
+    total_versions = 0
+    failed_files = []
+    total_errors = 0
+    total_warnings = 0
+
+    for file_path, results in all_results.items():
+        total_files += 1
+        file_versions = len({r.details.get("archive_id", "") for r in results if r.details})
+        total_versions += file_versions
+
+        file_valid = True
+        file_errors = 0
+        file_warnings = 0
+
+        for result in results:
+            if not result.is_valid:
+                file_valid = False
+            file_errors += len(result.errors)
+            file_warnings += len(result.warnings)
+
+        total_errors += file_errors
+        total_warnings += file_warnings
+
+        status = "[PASS]" if file_valid else "[FAIL]"
+        click.echo(f"{status} {file_path}")
+
+        if file_errors > 0:
+            click.echo(f"    {file_errors} error(s), {file_warnings} warning(s)")
+            failed_files.append(file_path)
+
+    click.echo()
+    click.echo(f"Validated {total_files} file(s) with {total_versions} version(s)")
+
+    if total_errors == 0:
+        click.echo(click.style("SUCCESS: All archives passed validation", fg="green"))
+    else:
+        click.echo(click.style(f"FAILED: {len(failed_files)} file(s) failed validation", fg="red"))
+        click.echo(f"Total: {total_errors} error(s), {total_warnings} warning(s)")
+
+        if failed_files:
+            click.echo("\nFailed files:")
+            for failed_file in failed_files:
+                click.echo(f"  - {failed_file}")
+
+        sys.exit(1)
