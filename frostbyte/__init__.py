@@ -30,9 +30,14 @@ def init() -> bool:
 
 
 def archive(
-    file_path: str, quiet: bool = False, progress_callback: Optional[Callable[[float], None]] = None
+    file_path: str,
+    quiet: bool = False,
+    verify: bool = True,
+    progress_callback: Optional[Callable[[float], None]] = None,
 ) -> Dict:
-    return get_manager().archive(file_path, quiet=quiet, progress_callback=progress_callback)
+    return get_manager().archive(
+        file_path, quiet=quiet, verify=verify, progress_callback=progress_callback
+    )
 
 
 def restore(
