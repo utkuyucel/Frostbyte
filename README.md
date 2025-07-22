@@ -4,7 +4,7 @@
 
 > Cold Data Archiving for Data Workflows
 
-Frostbyte is a lightweight tool that compresses, versions, and manages your large data files (CSV, Parquet, Excel). Perfect for data scientists and analysts who need to save disk space while keeping data organized.
+Frostbyte is a lightweight tool that compresses, versions, and manages your large data files (CSV, Parquet, Excel). Perfect for data scientists and analysts who need to save disk space while keeping data organized & versioned.
 
 ## Version Control
 
